@@ -1,0 +1,109 @@
+.\"$Id: wsd.1.in,v 1.2 2005/08/07 22:33:43 rdilley Exp $\"
+.TH WSD 1  "1 August 2005" "wsd @VERSION@" "wsd @VERSION@"
+.SH NAME
+wsd \- Wire Spy daemon.
+.SH SYNOPSIS
+.na
+.B wsd
+[
+.B \-hv
+] [
+.B \-c
+.I chroot\-dir
+] [
+.B \-d
+.I log\-level
+] [
+.B \-g
+.I group
+] [
+.B \-i
+.I interface
+] [
+.B \-l
+.I log\-dir
+] [
+.B \-p
+.I pid\-file
+] [
+.B \-u
+.I user
+]
+.SH DESCRIPTION
+.LP
+.B \flwsd\fP is short for passive syslog monitor daemon. psmd listens on an interface and writes the syslog messages that it sees to disk along with an md5 hash.
+.SH OPTIONS
+.TP
+.B \-c
+Change root directory to \flchroot\-dir\fP.
+.TP
+.B \-d
+Enable debug mode, the higher the \fllog\-level\fP, the more verbose the logging.
+.TP
+.B \-g
+Drop group priviledges to \flgroup\fP.
+.TP
+.B \-h
+Display help details.
+.TP
+.B \-i
+Monitor packets on \flinterface\fP.
+.TP
+.B \-l
+Place log files in \fllog\-dir\fP.
+.TP
+.B \-p
+Write running processes PID to \flpid\-file\fP.
+.TP
+.B \-u
+Drop user priviledges to \fluser\fP.
+.TP
+.B \-v
+Show version information.
+
+.SH DIAGNOSTICS
+\flpsmd\fP returns 0 on normal program termination and 1 on error.  Additional diagnostic information is available through the \-d command line switch.
+
+.SH SIGNALS
+.TP
+.B \flSIGHUP\fP will cause \flpsmd\fP to close the current logfile and write out the hash, then start a new logfile.
+.TP
+.B \flSIGTERM\fP will cause \flpsmd\fP to shutdown.
+.SH FILES
+.TP
+.B /var/run/psmd.pid
+.TP
+.B /var/log/psmd/
+
+.SH SEE ALSO
+
+pcap(3)
+
+.SH COPYRIGHT
+psmd is Copyright (c) 2003-2004 Ron Dilley.
+
+This program is free software; you can redistribute it and/or modify 
+it under the terms of the GNU General Public License as published 
+by the Free Software Foundation; either version 2 of the License, 
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, 
+but WITHOUT ANY WARRANTY; without even the implied warranty of 
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the 
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License 
+along with this program; if not, write to the Free Software 
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, 
+MA 02111-1307 USA.
+
+.SH BUGS
+Please send problems, bugs, questions, desirable enhancements, etc. to:
+psmd-workers@uberadmin.com
+
+Please send source code contributions, etc. to:
+psmd-patches@uberadmin.com
+
+There are no documented bugs at this time.
+.SH AUTHORS
+Ron Dilley e-mail: ron.dilley@uberadmin.com

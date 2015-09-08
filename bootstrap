@@ -1,0 +1,13 @@
+#!/bin/sh
+
+#AUTOMAKE_VERSION=1.15;export AUTOMAKE_VERSION
+#AUTOCONF_VERSION=2.69;export AUTOCONF_VERSION
+
+echo "wsd - bootstrap"
+automake --gnu --add-missing
+aclocal
+autoheader
+autoconf
+
+#configure
+#make
