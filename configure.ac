@@ -20,7 +20,7 @@ AC_ARG_ENABLE(debug,
     [  --enable-debug          Enable debugging],
     [ if test "$GCC" = yes; then
           DEBUG="yes"
-          CFLAGS="${CFLAGS} -DDEBUG -ggdb"
+          CFLAGS="${CFLAGS} -DDEBUG -ggdb -pg"
       else
           DEBUG="yes"
           CFLAGS="${CFLAGS} -DDEBUG"
@@ -64,6 +64,7 @@ case "$host" in
     *-openbsd*)
         AC_DEFINE([BSD_DERIVED],1,BSD_DERIVED)
         AC_DEFINE([OPENBSD],1,OPENBSD)
+        CFLAGS="${CFLAGS} -Wbounded"
 	LDFLAGS="${LDFLAGS}"
         ;;
     *-apple*)
@@ -176,6 +177,7 @@ fi
 dnl ############## Header Checks
 
 AC_HEADER_DIRENT
+AC_CHECK_HEADERS([sys/types.h])
 AC_CHECK_HEADERS([arpa/inet.h])
 AC_CHECK_HEADERS([sys/socket.h])
 AC_CHECK_HEADERS([net/if_arp.h], [], [],
@@ -187,14 +189,20 @@ AC_CHECK_HEADERS([fcntl.h])
 AC_CHECK_HEADERS([netdb.h])
 AC_CHECK_HEADERS([netinet/in.h])
 AC_CHECK_HEADERS([netinet/ip.h], [], [],
-[#if HAVE_ARPA_INET_H
+[#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#if HAVE_ARPA_INET_H
 # include <arpa/inet.h>
 #endif
 ])
 AC_CHECK_HEADERS([netinet/udp.h])
 AC_CHECK_HEADERS([netinet/tcp.h])
-AC_CHECK_HEADERS([netinet/ip_icmp.h], [], [],
-[#if HAVE_ARPA_INET_H
+AC_CHECK_HEADERS([netinet/ip.h netinet/ip_icmp.h], [], [],
+[#if HAVE_SYS_TYPES_H
+# include <sys/types.h>
+#endif
+#if HAVE_ARPA_INET_H
 # include <arpa/inet.h>
 #endif
 #if HAVE_NETINET_IP_H
@@ -229,7 +237,6 @@ AC_CHECK_HEADERS([sys/bitypes.h])
 AC_CHECK_HEADERS([sys/dir.h])
 AC_CHECK_HEADERS([sys/ndir.h])
 AC_CHECK_HEADERS([sys/stat.h])
-AC_CHECK_HEADERS([sys/types.h])
 AC_CHECK_HEADERS([syslog.h])
 AC_CHECK_HEADERS([dirent.h])
 AC_CHECK_HEADERS([inttypes.h])
@@ -267,6 +274,8 @@ AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([socket])
 AC_CHECK_FUNCS([strchr])
 AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNCS([strlcpy])
+AC_CHECK_FUNCS([strlcat])
 AC_FUNC_CLOSEDIR_VOID
 AC_FUNC_FORK
 AC_FUNC_LSTAT
@@ -282,6 +291,8 @@ AC_TYPE_PID_T
 AC_TYPE_SIGNAL
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
+AC_CHECK_SIZEOF([size_t])
+AC_CHECK_SIZEOF([time_t])
 
 AM_CONFIG_HEADER(include/config.h)
 AC_PROG_INSTALL

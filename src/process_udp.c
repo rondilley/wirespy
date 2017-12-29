@@ -2,7 +2,7 @@
  *
  * Process UDP Packets
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -55,14 +55,6 @@ PRIVATE char *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 extern int quit;
 extern Config_t *config;
 
-/* md5 stuff */
-extern struct MD5Context md5_ctx;
-extern unsigned char md5_digest[16];
-
-/* sha1 suff */
-extern struct SHA1Context sha1_ctx;
-extern unsigned char sha1_digest[20];
-
 /****
  *
  * functions
@@ -80,7 +72,8 @@ void processUdpPacket( struct trafficRecord *tr, const u_char *packet ) {
   const char *payload;
   const char *tmp_ptr;
   const int size_udp = sizeof( struct udphdr );
-
+  PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+  PRIVATE char d_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
   PRIVATE int bytes_sent;
   PRIVATE u_int ip_hlen, ip_ver, ip_off, ip_offidx;
   PRIVATE int ip_len;
@@ -93,7 +86,7 @@ void processUdpPacket( struct trafficRecord *tr, const u_char *packet ) {
   PRIVATE struct trafficRecord *tr_tmp, *tmpTrPtr;
   PRIVATE struct tcpFlow *tf_ptr;
   time_t currentTime = time( NULL );
-
+  
   /* process packet */
 
   /*
@@ -110,43 +103,60 @@ void processUdpPacket( struct trafficRecord *tr, const u_char *packet ) {
   udp_ptr = (struct udphdr*)( packet );
 
 #ifdef BSD_DERIVED
-  tr->sPort = ntohs( udp_ptr->uh_sport );
-  tr->dPort = ntohs( udp_ptr->uh_dport );
+  tr->aRec.sPort = ntohs( udp_ptr->uh_sport );
+  tr->aRec.dPort = ntohs( udp_ptr->uh_dport );
 #else
-  tr->sPort = ntohs( udp_ptr->source );
-  tr->dPort = ntohs( udp_ptr->dest );
+  tr->aRec.sPort = ntohs( udp_ptr->source );
+  tr->aRec.dPort = ntohs( udp_ptr->dest );
 #endif
 
 #ifdef DEBUG
   if ( config->debug >= 3 ) {
-    display( LOG_INFO, "UDP: S: %d D: %d", ntohs( tr->sPort ), ntohs( tr->dPort ) );
+    display( LOG_INFO, "UDP: S: %u D: %u", ntohs( tr->aRec.sPort ), ntohs( tr->aRec.dPort ) );
   }
 #endif
 
+  if ( ! config->verbose )
+      return;
+  
   /*
    * write to log
    */
-    
-  XSTRNCPY( s_ip_addr_str, inet_ntoa( tr->sIp ), MAX_IP_ADDR_LEN );
-  XSTRNCPY( d_ip_addr_str, inet_ntoa( tr->dIp ), MAX_IP_ADDR_LEN );
-  fprintf( config->log_st, "[%04d/%02d/%02d %02d:%02d:%02d] %16s:%-5u -> %16s:%-5u UDP\n",
-	   tr->wireTime.tm_year+1900,
-	   tr->wireTime.tm_mon+1,
-	   tr->wireTime.tm_mday,
-	   tr->wireTime.tm_hour,
-	   tr->wireTime.tm_min,
-	   tr->wireTime.tm_sec,
-	   s_ip_addr_str,
-	   tr->sPort,
-	   d_ip_addr_str,
-	   tr->dPort
-	   );
+  XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)tr->aRec.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+  XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)tr->aRec.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );    
+  XSTRNCPY( s_ip_addr_str, inet_ntoa( tr->aRec.sIp ), MAX_IP_ADDR_LEN );
+  XSTRNCPY( d_ip_addr_str, inet_ntoa( tr->aRec.dIp ), MAX_IP_ADDR_LEN );
 
+#if SIZEOF_SIZE_T == 8
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u -> %16s:%-5u UDP\n",
+           tr->wire_sec,
+           tr->wire_usec,
+#else
+#ifdef OPENBSD
+  fprintf( config->log_st, "[%lu.%06lu] ",
+           tr->wire_sec,
+           tr->wire_usec );
+  fprintf( config->log_st, "%17s->%-17s %16s:%-5u -> %16s:%-5u UDP\n",
+#else
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u -> %16s:%-5u UDP\n",
+           tr->wire_sec,
+           tr->wire_usec,
+#endif
+#endif
+           s_eth_addr_str,
+           d_eth_addr_str,
+	   s_ip_addr_str,
+	   tr->aRec.sPort,
+	   d_ip_addr_str,
+	   tr->aRec.dPort
+	   );
+  
   /*
    * done with packet, fall through
    */
   
   /* cleanup, we will do nothing with this packet */
+  
   return;
 }
 

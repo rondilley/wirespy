@@ -2,7 +2,7 @@
  *
  * libpcap based packet processor
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,15 +19,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ****/
-
-/*****
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- *****/
 
 /****
  *
@@ -54,14 +45,6 @@ PRIVATE char *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 
 extern int quit;
 extern Config_t *config;
-
-/* md5 stuff */
-extern struct MD5Context md5_ctx;
-extern unsigned char md5_digest[16];
-
-/* sha1 suff */
-extern struct SHA1Context sha1_ctx;
-extern unsigned char sha1_digest[20];
 
 /****
  *
@@ -199,10 +182,15 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
   }
 #endif
 
-  /* convert packet time into something usable */
-  localtime_r((const time_t*)&header->ts.tv_sec, &pkt_time);
-
+  /* clear traffic report */
+  XMEMSET( &tr, 0, sizeof( struct trafficRecord ) );
+  tr.wire_sec = (time_t)(header->ts.tv_sec);
+  tr.wire_usec = (time_t)(header->ts.tv_usec);
+  
 #ifdef DEBUG
+  /* convert packet time into something usable */
+  localtime_r(&tr.wire_sec, &pkt_time);
+
   if ( config->debug >= 5 ) {
     display( LOG_DEBUG, "Received at [%04d/%02d/%02d %02d:%02d:%02d.%06d]",
 	     pkt_time.tm_year+1900,
@@ -215,10 +203,6 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
   }
 #endif
 
-  /* clear traffic report */
-  XMEMSET( &tr, 0, sizeof( tr ) );
-
-  XMEMCPY( &tr.wireTime, &pkt_time, sizeof( pkt_time ) );
   tr.next = NULL;
   tr.prev = NULL;
 
@@ -247,10 +231,10 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
  ****/
 
 void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *packet ) {
-  const struct ether_header *ethernet_ptr;
-  const char *payload;
-  const char *tmp_ptr;
-  const int size_ethernet = sizeof( struct ether_header );
+  struct ether_header *ethernet_ptr;
+  char *payload;
+  char *tmp_ptr;
+  int size_ethernet = sizeof( struct ether_header );
   PRIVATE int bytes_sent;
   /* this is easier to read */
   PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
@@ -274,10 +258,15 @@ void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *
   /* proto decode */
   ethernet_ptr = (struct ether_header*)(packet);
 
-  /* convert packet time into something usable */
-  localtime_r((const time_t*)&header->ts.tv_sec, &pkt_time);
+  /* clear traffic report */
+  XMEMSET( &tr, 0, sizeof( struct trafficRecord ) );
+  tr.wire_sec = (time_t)(header->ts.tv_sec);
+  tr.wire_usec = (time_t)(header->ts.tv_usec);
 
 #ifdef DEBUG
+  /* convert packet time into something usable */
+  localtime_r(&tr.wire_sec, &pkt_time);
+
   if ( config->debug >= 5 ) {
     display( LOG_DEBUG, "Received at [%04d/%02d/%02d %02d:%02d:%02d.%06d]",
 	     pkt_time.tm_year+1900,
@@ -299,15 +288,11 @@ void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *
   }
 #endif
 
-  /* clear traffic report */
-  XMEMSET( &tr, 0, sizeof( tr ) );
-
-  XMEMCPY( &tr.wireTime, &pkt_time, sizeof( pkt_time ) );
   tr.next = NULL;
   tr.prev = NULL;
-  XMEMCPY( &tr.sMac, ethernet_ptr->ether_shost, ETHER_ADDR_LEN );
-  XMEMCPY( &tr.dMac, ethernet_ptr->ether_dhost, ETHER_ADDR_LEN );
-  tr.ethProto = ethernet_ptr->ether_type;
+  XMEMCPY( &tr.aRec.sMac, ethernet_ptr->ether_shost, ETHER_ADDR_LEN );
+  XMEMCPY( &tr.aRec.dMac, ethernet_ptr->ether_dhost, ETHER_ADDR_LEN );
+  tr.aRec.ethProto = ethernet_ptr->ether_type;
 
   if (ntohs( ethernet_ptr->ether_type ) EQ ETHERTYPE_IP ) { /* IP */
 

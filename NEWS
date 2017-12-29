@@ -2,3 +2,15 @@ Version 0.1 (Aug 1, 2005):
 
 * First public release.
 
+Version 0.2 (Dec 18, 2017):
+
+* Added support for SHA256
+* Added support for PCAP files
+
+Version 0.3 (Dec 20, 2017):
+
+* Added hash support
+
+Version 0.4 (Dec 27, 2017):
+
+* Minor bug and memory fixes

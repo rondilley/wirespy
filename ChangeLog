@@ -2,3 +2,16 @@
 
         * Initial public release.
 
+2017-12-18  Ron Dilley <ron.dilley@uberadmin.com>
+
+	* Minor updates and bug fixes
+	* Added support for SHA256
+	* Added option to read from pcap files
+	* Added caching of current state for reading multiple pcap files
+	* Removed support for SHA1
+
+2017-12-27  Ron Dilley <ron.dilley@uberadmin.com>
+
+	* Replaced TCP Flow lookups with hashes
+	* Minor bug and memory fixes
+

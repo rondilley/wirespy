@@ -2,7 +2,7 @@
  *
  * Headers for Process TCP Packets
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -46,15 +46,13 @@
 
 #include <sysdep.h>
 
-#ifndef SYSDEP_H
+#ifndef SYSDEP_DOT_H
 #error something is messed up
 #endif
 
 #include <common.h>
 #include "util.h"
 #include "mem.h"
-#include "md5.h"
-#include "sha1.h"
 
 /****
  *
@@ -75,6 +73,9 @@
  ****/
 
 void processTcpPacket( struct trafficRecord *tr, const u_char *packet );
-void logTcpPacket( struct tcpFlow *tfPtr, struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir );
+void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir );
+int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr );
+void pruneFlows( void );
+int reportTcpFlow( struct tcpFlow *tfPtr );
 
 #endif /* PROCESS_TCP_DOT_H */

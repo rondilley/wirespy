@@ -2,7 +2,7 @@
  *
  * Headers for Process IP Packets
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -41,7 +41,7 @@
 
 #include <sysdep.h>
 
-#ifndef SYSDEP_H
+#ifndef SYSDEP_DOT_H
 #error something is messed up
 #endif
 
@@ -50,8 +50,6 @@
 #include "process_tcp.h"
 #include "util.h"
 #include "mem.h"
-#include "md5.h"
-#include "sha1.h"
 
 /****
  *

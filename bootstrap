@@ -1,13 +1,19 @@
 #!/bin/sh
+#
+# desc: simple script to run all auto commands
+#
+####
 
-#AUTOMAKE_VERSION=1.15;export AUTOMAKE_VERSION
-#AUTOCONF_VERSION=2.69;export AUTOCONF_VERSION
+# defines needed for OpenBSD
+AUTOMAKE_VERSION=1.15;export AUTOMAKE_VERSION
+AUTOCONF_VERSION=2.69;export AUTOCONF_VERSION
 
-echo "wsd - bootstrap"
-automake --gnu --add-missing
+if [ ! -d config ]; then
+ mkdir config
+fi
+
 aclocal
-autoheader
+automake --gnu --add-missing
 autoconf
+autoheader
 
-#configure
-#make

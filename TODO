@@ -3,9 +3,12 @@ psmd TODO list
 
 Short-term:
 -----------
-* get this code running
+* Ability to summarize TCP sessions
+* PCAP file processing
 
 Long-term:
 ----------
-* add more link-types
+* Add more link-types
+* Add ICMP processor
+* Add support for non-TCP/UDP traffic
 

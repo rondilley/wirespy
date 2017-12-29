@@ -2,7 +2,7 @@
  *
  * Headers for Wirespy Daemon
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -41,7 +41,7 @@
 #define LOOP_PACKET_COUNT 16
 #define LOOP_PACKET_TIME 5 /* seconds */
 
-#define MAX_IP_ADDR_LEN 24
+#define MAX_IP_ADDR_LEN 46
 
 #define LOGDIR "/var/log/wsd"
 #define MAX_LOG_LINE 2048
@@ -73,15 +73,14 @@
 
 #include <sysdep.h>
 
-#ifndef SYSDEP_H
+#ifndef SYSDEP_DOT_H
 #error something is messed up
 #endif
 
 #include <common.h>
 #include "util.h"
 #include "mem.h"
-#include "md5.h"
-#include "sha1.h"
+#include "hash.h"
 
 /****
  *
@@ -95,29 +94,40 @@
  *
  ****/
 
-/* traffic record */
-struct trafficRecord {
-  struct trafficRecord *next;
-  struct trafficRecord *prev;
-  struct tm wireTime;
+/* traffic address record */
+struct trafficAddressRecord {
   u_char sMac[ETHER_ADDR_LEN];
   u_char dMac[ETHER_ADDR_LEN];
-  u_short ethProto;
+  u_short ethProto;    
   struct in_addr sIp;
   struct in_addr dIp;
-  u_int32_t seq;
-  u_int32_t ack;
-  u_int16_t win;
-  u_int16_t size;
   u_char ipProto;
   u_short sPort; /* or icmp type */
   u_short dPort; /* or icmp code */
 };
 
+/* traffic record */
+struct trafficRecord {
+  struct trafficRecord *next;
+  struct trafficRecord *prev;
+  time_t wire_sec;
+  time_t wire_usec;
+  u_char sMac[ETHER_ADDR_LEN];
+  u_char dMac[ETHER_ADDR_LEN];
+  u_short ethProto;
+  struct trafficAddressRecord aRec;
+  u_int32_t seq;
+  u_int32_t ack;
+  u_int16_t win;
+  u_int16_t size;
+};
+
+
 /* tcp flows */
 struct tcpFlow {
   struct tcpFlow *prev;
   struct tcpFlow *next;
+  time_t firstUpdate;
   time_t lastUpdate;
   int status;
 #define TCP_FLOW_IGNORE 0
@@ -130,10 +140,12 @@ struct tcpFlow {
   u_int32_t clientIsn;
   u_int32_t serverIsn;
   int recordCount;
-  struct in_addr sIp;
-  u_short sPort;
-  struct in_addr dIp;
-  u_short dPort;
+  size_t packetsOut;
+  size_t packetsIn;
+  size_t bytesOut;
+  size_t bytesIn;
+  struct trafficAddressRecord aRecOut;
+  struct trafficAddressRecord aRecIn;
   struct trafficRecord *head;
   struct trafficRecord *tail;
 };
@@ -146,7 +158,6 @@ struct trafficRecordIndex {
 };
 
 /* acl record */
-
 struct accessControlList {
   struct accessControlList *prev;
   struct accessControlList *next;
@@ -184,18 +195,22 @@ typedef struct {
   struct in_addr in_dev_net_mask;
   pcap_t *pcap_handle;
   int debug;
+  int verbose;
   int mode;
   int write_fd;
+  int pruneCounter;
   unsigned long pktcount;
   unsigned long pcap_rec;
   unsigned long pcap_drop;
   time_t current_time;
   pid_t cur_pid;
   /* traffic specific items */
-  struct trafficRecord *trHead;
-  struct trafficRecord *trTail;
+  //struct trafficRecord *trHead;
+  //struct trafficRecord *trTail;
   struct tcpFlow *tfHead;
   struct tcpFlow *tfTail;
+  struct hash_s *tcpFlowHash;
+  size_t flowCount;
   struct trafficRecordIndex *sEthHead;
   struct trafficRecordIndex *dEthHead;
   struct trafficRecordIndex *sIpHead;
@@ -231,7 +246,6 @@ void dl_raw(u_char *args, const struct pcap_pkthdr *header, const u_char *packet
 void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
 void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
 void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, struct trafficRecord *tr, const u_char *packet );
-int sortTcpFlow( struct tcpFlow *tfPtr );
 PRIVATE int avg_loop_count( int cur_loop_count );
 bpf_u_int32 get_iface_info( char *device );
 

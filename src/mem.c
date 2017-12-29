@@ -1,20 +1,24 @@
-/*****
- *           mem.c  -  description
- *           -------------------
- * begin     : Mon August 1 2005
- * copyright : (C) 2005 by Ron Dilley
- * email     : ron.dilley@uberadmin.com
+/****
  *
- *****/
-
-/*****
+ * Memory functions
+ * 
+ * Copyright (c) 2006-2017, Ron Dilley
+ * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
+ * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- *****/
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ****/
 
 /****
  *
@@ -88,9 +92,14 @@ PUBLIC char *copy_argv(char *argv[]) {
 
   *buf = 0;
   for (arg = argv; *arg != NULL; arg++) {
-    strcat(buf, *arg);
-    strcat(buf, " ");
-  }
+#ifdef HAVE_STRLCAT
+    strlcat( buf, *arg, total_length );
+    strlcat( buf, " ", total_length );      
+#else
+    strncat( buf, *arg, total_length );
+    strncat( buf, " ", total_length );
+#endif
+}
 
   return buf;
 }
@@ -392,6 +401,30 @@ void *xmemset_( void *ptr, const char value, const int size, const char *filenam
   fprintf( stderr, "0x%x memset %s:%d (%d bytes)\n", result, filename, linenumber, size);
 #endif
 
+  return result;
+}
+
+/****
+ *
+ * compare memory
+ * 
+ ****/
+
+int xmemcmp_(const void *s1, const void *s2, size_t n, const char *filename, const int linenumber ) {
+  int result;
+    
+  if ( s1 EQ NULL || s2 EQ NULL ) {
+    fprintf( stderr, "memcmp() called with NULL ptr at %s:%d\n", filename, linenumber );
+    quit = TRUE;
+    exit( 1 );
+  }
+  
+  result = memcmp( s1, s2, n );
+  
+#ifdef DEBUG_MEM
+  fprintf( stderr, "0x%x memcmp against 0x%x %s:%d (%d bytes)\n", s1, s2, filename, linenumber, n );
+#endif
+  
   return result;
 }
 

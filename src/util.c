@@ -2,7 +2,7 @@
  *
  * Utility Functions
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -77,11 +77,11 @@ extern char **environ;
 
 int display( int level, char *format, ... ) {
   PRIVATE va_list args;
-  PRIVATE char tmp_buf[SYSLOG_MAX];
+  PRIVATE char tmp_buf[SYSLOG_MAX+1];
   PRIVATE int i;
 
   va_start( args, format );
-  vsprintf( tmp_buf, format, args );
+  vsnprintf( tmp_buf, SYSLOG_MAX, format, args );
   if ( tmp_buf[strlen(tmp_buf)-1] == '\n' ) {
     tmp_buf[strlen(tmp_buf)-1] = 0;
   }
@@ -89,7 +89,7 @@ int display( int level, char *format, ... ) {
 
   if ( config->mode != MODE_INTERACTIVE ) {
     /* display info via syslog */
-    syslog( level, tmp_buf );
+    syslog( level, "%s", tmp_buf );
   } else {
     if ( level <= LOG_ERR ) {
       /* display info via stderr */
@@ -169,7 +169,11 @@ int is_dir_safe( const char *dir ) {
   } while ( new_dir[1] ); /* new_dir[0] will always be a slash */
   if ( !new_dir[1] ) rc = 1;
 
-  fchdir( dirfd( start ) );
+  if ( fchdir( dirfd( start ) ) EQ FAILED ) {
+    fprintf( stderr, "ERR - Unable to fchdir\n" );
+    return FAILED;
+  }
+  
   closedir( start );
   return rc;
 }

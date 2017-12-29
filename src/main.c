@@ -2,7 +2,7 @@
  *
  * Wirespy
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -43,13 +43,6 @@
 PUBLIC int quit = FALSE;
 PUBLIC int reload = FALSE;
 PUBLIC Config_t *config = NULL;
-
-/* md5 stuff */
-PUBLIC struct MD5Context md5_ctx;
-PUBLIC unsigned char md5_digest[16];
-/* sha1 stuff */
-PUBLIC struct SHA1Context sha1_ctx;
-PUBLIC unsigned char sha1_digest[20];
 
 /****
  *
@@ -111,7 +104,8 @@ int main(int argc, char *argv[]) {
   home_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
   strncpy( home_dir, ( char * )pwd_ent->pw_dir, MAXPATHLEN );
   endpwent();
-
+  XFREE( tmp_ptr );
+  
   /* get real uid and gid in prep for priv drop */
   config->gid = getgid();
   config->uid = getuid();
@@ -122,6 +116,7 @@ int main(int argc, char *argv[]) {
     static struct option long_options[] = {
       {"logdir", required_argument, 0, 'l' },
       {"version", no_argument, 0, 'v' },
+      {"verbose", no_argument, 0, 'V' },
       {"debug", required_argument, 0, 'd' },
       {"help", no_argument, 0, 'h' },
       {"iniface", required_argument, 0, 'i' },
@@ -132,7 +127,7 @@ int main(int argc, char *argv[]) {
       {0, no_argument, 0, 0}
     };
 
-    c = getopt_long(argc, argv, "vd:hi:l:p:u:g:", long_options, &option_index);
+    c = getopt_long(argc, argv, "vVd:hi:l:p:u:g:", long_options, &option_index);
     if (c EQ -1)
       break;
 
@@ -150,6 +145,11 @@ int main(int argc, char *argv[]) {
       print_version();
       return( EXIT_SUCCESS );
 
+    case 'V':
+      /* print more detailed traffic logs */
+      config->verbose = TRUE;
+      break;
+      
     case 'd':
       /* show debig info */
       config->debug = atoi( optarg );
@@ -307,7 +307,11 @@ int main(int argc, char *argv[]) {
       /* this is the second child, really confused? */
 
       /* move to '/' */
-      chdir( "/" );
+      if ( chdir( "/" ) EQ FAILED ) {
+        display( LOG_ERR, "Can't chdir to [/]" );
+        cleanup();
+        exit( EXIT_FAILURE );
+      }
 
       /* close all open files */
       if ( ( fds = getdtablesize() ) EQ FAILED ) fds = MAX_FILE_DESC;
@@ -349,7 +353,11 @@ int main(int argc, char *argv[]) {
     display( LOG_DEBUG, "CWD: %s", home_dir );
 #endif
     /* move into home dir */
-    chdir( home_dir );
+    if ( chdir( home_dir ) EQ FAILED ) {
+      display( LOG_ERR, "Can't chdir to [%s]", home_dir );
+      cleanup();
+      exit( EXIT_FAILURE );
+    }
     config->display_to_pipe = FALSE;
   } else {
     /* chroot this puppy */
@@ -363,7 +371,12 @@ int main(int argc, char *argv[]) {
       cleanup();
       exit( EXIT_FAILURE );
     }
-    chdir( "/" );
+    
+    if ( chdir( "/" ) EQ FAILED ) {
+      display( LOG_ERR, "Can't chdir to [/]" );
+      cleanup();
+      exit( EXIT_FAILURE );
+    }
   }
 
   /* setup gracefull shutdown */
@@ -396,8 +409,12 @@ int main(int argc, char *argv[]) {
   /* get processor hostname */
   if ( gethostname( config->hostname, MAXHOSTNAMELEN ) != 0 ) {
     display( LOG_ERR, "Unable to get hostname" );
-    strcpy( config->hostname, "unknown" );
-  }
+#ifdef HAVE_STRLCPY
+    strlcpy( config->hostname, "unknown", 8 );
+#else
+    strncpy( config->hostname, "unknown", 8 );
+#endif
+}
 
   config->cur_pid = getpid();
   /* start collecting */
@@ -574,6 +591,8 @@ void ctime_prog( int signo ) {
     display( LOG_WARNING, "Time update inconsistent [%d] [%d]", ret, config->current_time );
   }
 
+  config->pruneCounter++;
+  
   /* reset SIGALRM */
   signal( SIGALRM, ctime_prog );
   /* reset alarm */
@@ -652,6 +671,16 @@ void drop_privileges( void ) {
 
 /****
  *
+ * start processing pcap file
+ * 
+ ****/
+
+PRIVATE int process_pcap( char *fName ) {
+    
+}
+
+/****
+ *
  * start collecting traffic
  *
  ****/
@@ -681,10 +710,8 @@ PRIVATE int start_collecting( void ) {
   /* log stuff */
   char log_buf[MAX_LOG_LINE];
   XMEMSET( log_buf, 0, MAX_LOG_LINE );
-  char log_name[MAXPATHLEN];
-  XMEMSET( log_name, 0, MAXPATHLEN );
-  char log_digest_name[MAXPATHLEN];
-  XMEMSET( log_digest_name, 0, MAXPATHLEN );
+  char log_name[MAXPATHLEN+1];
+  XMEMSET( log_name, 0, MAXPATHLEN+1 );
   size_t log_buf_len;
   size_t write_count;
   struct tm current_time;
@@ -706,8 +733,12 @@ PRIVATE int start_collecting( void ) {
     config->in_dev_ip_addr_str = NULL;
   } else {
     config->in_dev_ip_addr_str = (char *)XMALLOC( ( sizeof(char) * MAX_IP_ADDR_LEN ) + 1 );
-    strcpy( config->in_dev_ip_addr_str, inet_ntoa( addr ) );
-  }
+#ifdef HAVE_STRLCPY
+    strlcpy( config->in_dev_ip_addr_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );    
+#else
+    strncpy( config->in_dev_ip_addr_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );
+#endif
+}
 
   /* ask pcap for the network address and mask of the device */
   if ( ( ret = pcap_lookupnet( config->in_iface, &netp, &maskp, errbuf ) ) EQ FAILED ) {
@@ -722,12 +753,20 @@ PRIVATE int start_collecting( void ) {
     addr.s_addr = netp;
     XMEMCPY( &config->in_dev_net_addr, &addr, sizeof( struct in_addr ) );
     config->in_dev_net_addr_str = (char *)XMALLOC( ( sizeof(char) * MAX_IP_ADDR_LEN ) + 1 );
-    strcpy( config->in_dev_net_addr_str, inet_ntoa( addr ) );
+#ifdef HAVE_STRLCPY
+    strlcpy( config->in_dev_net_addr_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );    
+#else
+    strncpy( config->in_dev_net_addr_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );
+#endif
     /* get netnmask */
     addr.s_addr = maskp;
     XMEMCPY( &config->in_dev_net_mask, &addr, sizeof( struct in_addr ) );
     config->in_dev_net_mask_str = (char *)XMALLOC( ( sizeof(char) * MAX_IP_ADDR_LEN ) + 1 );
-    strcpy( config->in_dev_net_mask_str, inet_ntoa( addr ) );
+#ifdef HAVE_STRLCPY
+    strlcpy( config->in_dev_net_mask_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );    
+#else
+    strncpy( config->in_dev_net_mask_str, inet_ntoa( addr ), MAX_IP_ADDR_LEN );
+#endif
   }
 
   /* start collecting */
@@ -740,7 +779,7 @@ PRIVATE int start_collecting( void ) {
   /* open pcap session */
   if ( ( handle = pcap_open_live( config->in_iface, BUFSIZ, 1, 0, errbuf ) ) == NULL ) {
     display( LOG_ERR, "Unable to open pcap session on [%s]", config->in_iface );
-    return;
+    return FAILED;
   } else {
     display( LOG_INFO, "libpcap initialized on: %s", config->in_iface );
   }
@@ -753,7 +792,8 @@ PRIVATE int start_collecting( void ) {
    * drop root privs
    *
    ****/
-  drop_privileges();
+  if ( ! config->debug ) // don't drop privs in debug mode so that core files are written
+    drop_privileges();
 
   /* display dev info */
   display( LOG_INFO, "Device: %s", config->in_iface );
@@ -785,7 +825,7 @@ PRIVATE int start_collecting( void ) {
   localtime_r(&config->current_time, &current_time);
   
   /* create log file name */
-  sprintf( log_name, "%s/%s_%04d%02d%02d_%02d%02d%02d.log",
+  snprintf( log_name, MAXPATHLEN, "%s/%s_%04d%02d%02d_%02d%02d%02d.log",
 	   config->log_dir,
 	   config->hostname,
 	   current_time.tm_year+1900,
@@ -794,9 +834,6 @@ PRIVATE int start_collecting( void ) {
 	   current_time.tm_hour,
 	   current_time.tm_min,
 	   current_time.tm_sec );
-               
-  /* create log digest name */
-  sprintf( log_digest_name, "%s.sig", log_name );
 
 #ifdef DEBUG
   if ( config->debug >= 4 ) {
@@ -811,12 +848,9 @@ PRIVATE int start_collecting( void ) {
     return FAILED;
   }
 
-  /* initialize md5 context */
-  MD5Init( &md5_ctx );
-
-  /* initialize the sha1 context */
-  SHA1Init( &sha1_ctx );
-
+  /* init hashes */
+  config->tcpFlowHash = initHash( 52 );
+  
   /* loop through pcap loops */
   for( ;; ) {
     /* save start time */
@@ -883,162 +917,10 @@ PRIVATE int start_collecting( void ) {
       /* close the log file */
       fclose( config->log_st );
 
-      /* finalize md5 hash */
-      MD5Final( md5_digest, &md5_ctx );
-
-      /* finalize sha1 hash */
-      SHA1Final( sha1_digest, &sha1_ctx );
-
-      /* open packet log digest */
-      if ( ( config->log_st = fopen( log_digest_name, "w" ) ) EQ NULL ) {
-	display( LOG_ERR, "Unable to open plog digest file [%s]", log_digest_name );
-	quit = TRUE;
-	return FAILED;
-      }
-
-      /* convert the md5 digest to hex */
-      sprintf( log_buf, "%s %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x md5\n",
-	       log_name,
-	       md5_digest[0],
-	       md5_digest[1],
-	       md5_digest[2],
-	       md5_digest[3],
-	       md5_digest[4],
-	       md5_digest[5],
-	       md5_digest[6],
-	       md5_digest[7],
-	       md5_digest[8],
-	       md5_digest[9],
-	       md5_digest[10],
-	       md5_digest[11],
-	       md5_digest[12],
-	       md5_digest[13],
-	       md5_digest[14],
-	       md5_digest[15] );
-	       
-      /* display md5 digest */
-      display( LOG_INFO, "%s", log_buf );
-
-      /* write the md5 digest */
-      if ( fputs( log_buf, config->log_st ) EQ EOF ) {
-	display( LOG_WARNING, "Unable to write to [%s]", log_digest_name );
-      }
-
-      /* convert the sha1 digest to hex */
-      sprintf( log_buf, "%s %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x sha1\n",
-	       log_name,
-	       sha1_digest[0],
-	       sha1_digest[1],
-	       sha1_digest[2],
-	       sha1_digest[3],
-	       sha1_digest[4],
-	       sha1_digest[5],
-	       sha1_digest[6],
-	       sha1_digest[7],
-	       sha1_digest[8],
-	       sha1_digest[9],
-	       sha1_digest[10],
-	       sha1_digest[11],
-	       sha1_digest[12],
-	       sha1_digest[13],
-	       sha1_digest[14],
-	       sha1_digest[15],
-	       sha1_digest[16],
-	       sha1_digest[17],
-	       sha1_digest[18],
-	       sha1_digest[19] );
-
-      /* display sha1 digest */
-      display( LOG_INFO, "%s", log_buf );
-
-      /* write the sha1 digest */
-      if ( fputs( log_buf, config->log_st ) EQ EOF ) {
-	display( LOG_WARNING, "Unable to write to [%s]", log_digest_name );
-      }
-
-      /* close the digest */
-      fclose( config->log_st );
-
-      return;
+      return TRUE;
     } else if ( reload EQ TRUE ) {
       /* time to rotate the logs */
       
-      fclose( config->log_st );
-
-      /* finalize md5 hash */
-      MD5Final( md5_digest, &md5_ctx );
-
-      /* finalize sha1 hash */
-      SHA1Final( sha1_digest, &sha1_ctx );
-
-      /* open packet log digest */
-      if ( ( config->log_st = fopen( log_digest_name, "w" ) ) EQ NULL ) {
-	display( LOG_ERR, "Unable to open plog digest file [%s]", log_digest_name );
-	quit = TRUE;
-	return;
-      }
-
-      /* convert the md5 digest to hex */
-      sprintf( log_buf, "%s %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x md5\n",
-	       log_name,
-	       md5_digest[0],
-	       md5_digest[1],
-	       md5_digest[2],
-	       md5_digest[3],
-	       md5_digest[4],
-	       md5_digest[5],
-	       md5_digest[6],
-	       md5_digest[7],
-	       md5_digest[8],
-	       md5_digest[9],
-	       md5_digest[10],
-	       md5_digest[11],
-	       md5_digest[12],
-	       md5_digest[13],
-	       md5_digest[14],
-	       md5_digest[15] );
-	       
-      /* display md5 digest */
-      display( LOG_INFO, "%s", log_buf );
-
-      /* write the md5 digest */
-      if ( fputs( log_buf, config->log_st ) EQ EOF ) {
-	display( LOG_WARNING, "Unable to write to [%s]", log_digest_name );
-      }
-
-      /* convert the sha1 digest to hex */
-      sprintf( log_buf, "%s %02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x sha1\n",
-	       log_name,
-	       sha1_digest[0],
-	       sha1_digest[1],
-	       sha1_digest[2],
-	       sha1_digest[3],
-	       sha1_digest[4],
-	       sha1_digest[5],
-	       sha1_digest[6],
-	       sha1_digest[7],
-	       sha1_digest[8],
-	       sha1_digest[9],
-	       sha1_digest[10],
-	       sha1_digest[11],
-	       sha1_digest[12],
-	       sha1_digest[13],
-	       sha1_digest[14],
-	       sha1_digest[15],
-	       sha1_digest[16],
-	       sha1_digest[17],
-	       sha1_digest[18],
-	       sha1_digest[19] );
-
-      /* display sha1 digest */
-      display( LOG_INFO, "%s", log_buf );
-
-      /* write the sha1 digest */
-      if ( fputs( log_buf, config->log_st ) EQ EOF ) {
-	display( LOG_WARNING, "Unable to write to [%s]", log_digest_name );
-      }
-
-      /* close the digest */
       fclose( config->log_st );
 
       /* empty out the traffic report linked lists */
@@ -1050,14 +932,8 @@ PRIVATE int start_collecting( void ) {
       /* initialize current time struct */
       localtime_r(&config->current_time, &current_time);
        
-      /* initialize md5 context */
-      MD5Init( &md5_ctx );
-
-      /* initialize sha1 context */
-      SHA1Init( &sha1_ctx );
-
       /* create log file name */
-      sprintf( log_name, "%s/%s_%04d%02d%02d_%02d%02d%02d.log",
+      snprintf( log_name, MAXPATHLEN, "%s/%s_%04d%02d%02d_%02d%02d%02d.log",
 	       config->log_dir,
 	       config->hostname,
 	       current_time.tm_year+1900,
@@ -1066,9 +942,6 @@ PRIVATE int start_collecting( void ) {
 	       current_time.tm_hour,
 	       current_time.tm_min,
 	       current_time.tm_sec );
-               
-      /* create log digest name */
-      sprintf( log_digest_name, "%s.sig", log_name );
 
 #ifdef DEBUG
       if ( config->debug >= 4 ) {
@@ -1080,7 +953,7 @@ PRIVATE int start_collecting( void ) {
       if ( ( config->log_st = fopen( log_name, "w" ) ) EQ NULL ) {
 	display( LOG_ERR, "Unable to open log file [%s]", log_name );
 	quit = TRUE;
-	return;
+	return FAILED;
       }
 
       /* reset reload flag */
@@ -1111,6 +984,9 @@ PRIVATE void cleanup( void ) {
   XFREE( config->in_dev_ip_addr_str );
   XFREE( config->in_iface );
 
+  if ( config->tcpFlowHash != NULL )
+      freeHash( config->tcpFlowHash );
+  
   cleanupTrafficReports();
   cleanupTcpFlows();
 
@@ -1122,43 +998,6 @@ PRIVATE void cleanup( void ) {
 
 /****
  *
- * sort tcp flow
- *
- ****/
-
-int sortTcpFlow( struct tcpFlow *tfPtr ) {
-  struct trafficRecord *trPtr = tfPtr->head;
-  struct trafficRecord *tmpTrPtr;
-  int found;
-  u_int tmpSeq;
-
-  display( LOG_DEBUG, "TCPFLOW: Sorting TCP Flow" );
-
-  while ( trPtr != NULL ) {
-    tmpSeq = trPtr->seq;
-
-    display( LOG_DEBUG, "TCPFLOW: Seq [%08x]", tmpSeq );
-
-    /* find ack */
-    tmpTrPtr = tfPtr->head;
-    found = FALSE;
-    while( tmpTrPtr != NULL ) {
-      if ( tmpTrPtr->seq == ( tmpSeq + 1 ) ) {
-	/* found the ack */
-	found = TRUE;
-      }
-    }
-    if ( ! found ) {
-      display( LOG_INFO, "TCPFLOW: No ack for [%08x]", tmpSeq );
-    }
-    trPtr = trPtr->next;
-  }
-
-  return TRUE;
-}
-
-/****
- *
  * cleanup traffic report linked lists
  *
  ****/
@@ -1166,25 +1005,7 @@ int sortTcpFlow( struct tcpFlow *tfPtr ) {
 void cleanupTrafficReports( void ) {
   int i = 0;
 
-  while( config->trHead != NULL ) {
-#ifdef DEBUG
-    i++;
-#endif
-    if ( config->trHead EQ config->trTail ) {
-      XFREE( config->trHead );
-      config->trHead = NULL;
-    } else {
-      config->trTail = config->trTail->prev;
-      XFREE( config->trTail->next );
-    }
-  }
-  config->trHead = config->trTail = NULL;
 
-#ifdef DEBUG
-  if ( config->debug >= 1 ) {
-    display( LOG_DEBUG, "[%d] traffic records deleted", i );
-  }
-#endif
 }
 
 /****
@@ -1194,26 +1015,66 @@ void cleanupTrafficReports( void ) {
  ****/
 
 void cleanupTcpFlows( void ) {
-  int i = 0;
+  struct tcpFlow *tfPtr, *tmpTfPtr;
+  int f = 0;
+  int r = 0;
 
-  while( config->tfHead != NULL ) {
+  tfPtr = config->tfHead;
+  while ( tfPtr != NULL ) {
 #ifdef DEBUG
-    i++;
+    if ( config->debug >= 4 )
+      display( LOG_DEBUG, "Removing records in old flow" );
 #endif
-    if ( config->tfHead EQ config->tfTail ) {
-      XFREE( config->tfHead );
-      config->tfHead = NULL;
-    } else {
-      config->tfTail = config->tfTail->prev;
-      XFREE( config->tfTail->next );
+
+    /* empty the traffic records related to this flow */
+        
+    while( tfPtr->head != NULL ) {
+#ifdef DEBUG
+      r++;
+#endif
+      if ( tfPtr->head EQ tfPtr->tail ) {
+        XFREE( tfPtr->head );
+        tfPtr->head = NULL;
+      } else {
+        tfPtr->tail = tfPtr->tail->prev;
+        XFREE( tfPtr->tail->next );
+      }
     }
-  }
-  config->tfHead = config->tfTail = NULL;
+    tfPtr->head = tfPtr->tail = NULL;
 
 #ifdef DEBUG
-  if ( config->debug >= 1 ) {
-    display( LOG_DEBUG, "[%d] tcp flow records deleted", i );
+    if ( config->debug >= 4 ) 
+      display( LOG_DEBUG, "Removing old flow" );
+#endif
+
+    tmpTfPtr = tfPtr;
+
+    if ( tfPtr EQ config->tfHead ) {
+      config->tfHead = tfPtr->next;
+    } else {
+      tfPtr->prev->next = tfPtr->next;
+    }
+
+    if ( tfPtr EQ config->tfTail ) {
+      config->tfTail = tfPtr->prev;
+    } else {
+      tfPtr->next->prev = tfPtr->prev;
+    }
+
+    /* remove hash flow records */
+    deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ) );
+    deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecIn, sizeof( struct trafficAddressRecord ) );
+
+    /* next flow record */
+    f++;
+    tfPtr = tfPtr->next;
+    XFREE( tmpTfPtr );
+    config->flowCount--;
   }
+
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+    display( LOG_DEBUG, "[%d] tcp flow records and [%d] tcp traffic records deleted", f, r );
 #endif
 }
 
@@ -1236,8 +1097,12 @@ bpf_u_int32 get_iface_info( char *device ) {
      display( LOG_ERR, "Unable to open socket" );
      return FAILED;
    }
-   XMEMSET(&ifr, 0, sizeof(ifr));
-   strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
+   XMEMSET(&ifr, 0, sizeof(struct ifreq));
+#ifdef HAVE_STRLCPY
+   strlcpy(ifr.ifr_name, device, sizeof(IFNAMSIZ));   
+#else
+   strncpy(ifr.ifr_name, device, sizeof(IFNAMSIZ));
+#endif
    ifr.ifr_addr.sa_family = AF_INET;
    if ( ( ioctl( sock_fd, SIOCGIFADDR, &ifr ) ) < 0 ) {
      display( LOG_ERR, "Unable to get ip address via ioctl" );

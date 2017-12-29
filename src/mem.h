@@ -1,35 +1,38 @@
-/*****
- * $Id: mem.h,v 1.2 2005/08/07 22:33:43 rdilley Exp $
+/****
  *
- *           mem.h  -  Memory related functions implimented as preprocessor macros and wrappers
- *           -------------------
- * begin     : Mon Aug 1 2005
- * copyright : (C) 2005 by Ron Dilley
- * email     : ron.dilley@uberadmin.com
+ * Memory function header file
+ * 
+ * Copyright (c) 2006-2017, Ron Dilley
+ * All rights reserved.
  *
- *****/
-
-/*****
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
  *
- *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the GNU General Public License as published by
- *   the Free Software Foundation; either version 2 of the License, or
- *   (at your option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- *****/
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ****/
 
 #ifndef MEM_DOT_H
 #define MEM_DOT_H
 
-#define XMALLOC(c)      xmalloc_(c,__FILE__,__LINE__)
-#define XFREE(ptr)      xfree_(ptr,__FILE__,__LINE__)
-#define XFREE_ALL()     xfree_all_(__FILE__,__LINE__)
-#define XMEMSET(s,c,n)  xmemset_(s,c,n,__FILE__,__LINE__)
-#define XMEMCPY(s,d,n)  xmemcpy_(s,d,n,__FILE__,__LINE__)
-#define XREALLOC(s,n)   xrealloc_(s,n,__FILE__,__LINE__)
-#define XSTRDUP(s)      xstrdup_(x,__FILE__,__LINE__)
-#define XSTRCPY(s,d)    xstrcpy_(s,d,__FILE__,__LINE__)
-#define XSTRNCPY(s,d,n) xstrncpy_(s,d,n,__FILE__,__LINE__)
+#define XMALLOC(c)       xmalloc_(c,__FILE__,__LINE__)
+#define XFREE(ptr)       xfree_(ptr,__FILE__,__LINE__)
+#define XFREE_ALL()      xfree_all_(__FILE__,__LINE__)
+#define XMEMSET(s,c,n)   xmemset_(s,c,n,__FILE__,__LINE__)
+#define XMEMCPY(d,s,n)   xmemcpy_(d,s,n,__FILE__,__LINE__)
+#define XREALLOC(s,n)    xrealloc_(s,n,__FILE__,__LINE__)
+#define XSTRDUP(s)       xstrdup_(x,__FILE__,__LINE__)
+#define XSTRCPY(d,s)     xstrcpy_(d,s,__FILE__,__LINE__)
+#define XSTRNCPY(d,s,n)  xstrncpy_(d,s,n,__FILE__,__LINE__)
+#define XMEMCMP(s1,s2,n) xmemcmp_(s1,s2,n,__FILE__,__LINE__)
 
 /****
  *
@@ -43,7 +46,7 @@
 
 #include <sysdep.h>
 
-#ifndef SYSDEP_H
+#ifndef SYSDEP_DOT_H
 #error something is messed up
 #endif
 
@@ -84,6 +87,7 @@ void *xmalloc_( int size, const char *filename, const int linenumber );
 void *xrealloc_( void *ptr, int size, const char *filename, const int linenumber);
 void *xmemset_( void *ptr, const char value, const int size, const char *filename, const int linenumber );
 void *xmemcpy_( void *d_ptr, void *s_ptr, const int size, const char *filename, const int linenumber );
+int xmemcmp_(const void *s1, const void *s2, size_t n, const char *filename, const int linenumber );
 void xfree_( void *ptr, const char *filename, const int linenumber );
 void xfree_all_( const char *filename, const int linenumber );
 char *xstrdup_( const char *str, const char *filename, const int linenumber );

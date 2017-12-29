@@ -2,7 +2,7 @@
  *
  * Process IP Packets
  * 
- * Copyright (c) 2006-2015, Ron Dilley
+ * Copyright (c) 2006-2017, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -19,15 +19,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ****/
-
-/*****
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- *****/
 
 /****
  *
@@ -55,14 +46,6 @@ PRIVATE char *months[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug
 extern int quit;
 extern Config_t *config;
 
-/* md5 stuff */
-extern struct MD5Context md5_ctx;
-extern unsigned char md5_digest[16];
-
-/* sha1 suff */
-extern struct SHA1Context sha1_ctx;
-extern unsigned char sha1_digest[20];
-
 /****
  *
  * functions
@@ -76,23 +59,23 @@ extern unsigned char sha1_digest[20];
  ****/
 
 void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, struct trafficRecord *tr, const u_char *packet ) {
-  const struct ip *ip_ptr;
-  const struct tcphdr *tcp_ptr;
-  const struct udphdr *udp_ptr;
+  struct ip *ip_ptr;
+  struct tcphdr *tcp_ptr;
+  struct udphdr *udp_ptr;
 #ifdef BSD_DERIVED
-  const struct icmp *icmp_ptr;
+  struct icmp *icmp_ptr;
 #else
-  const struct icmphdr *icmp_ptr;
+  struct icmphdr *icmp_ptr;
 #endif
-  const char *payload;
-  const char *tmp_ptr;
-  const int size_ip = sizeof( struct ip );
-  const int size_tcp = sizeof( struct tcphdr );
-  const int size_udp = sizeof( struct udphdr );
+  char *payload;
+  char *tmp_ptr;
+  int size_ip = sizeof( struct ip );
+  int size_tcp = sizeof( struct tcphdr );
+  int size_udp = sizeof( struct udphdr );
 #ifdef BSD_DERIVED
-  const int size_icmp = sizeof( struct icmp );
+  int size_icmp = sizeof( struct icmp );
 #else
-  const int size_icmp = sizeof( struct icmphdr );
+  int size_icmp = sizeof( struct icmphdr );
 #endif
   PRIVATE int bytes_sent;
   PRIVATE u_int ip_hlen, ip_ver, ip_off, ip_offidx;
@@ -206,10 +189,11 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
     return;
   }
 
-  XMEMCPY( &tr->sIp, &ip_ptr->ip_src, sizeof( struct in_addr ) );
-  XMEMCPY( &tr->dIp, &ip_ptr->ip_dst, sizeof( struct in_addr ) );
-  tr->ipProto = ip_ptr->ip_p;
-
+  // new way to store addr record
+  XMEMCPY( &tr->aRec.sIp, &ip_ptr->ip_src, sizeof( struct in_addr ) );
+  XMEMCPY( &tr->aRec.dIp, &ip_ptr->ip_dst, sizeof( struct in_addr ) );
+  tr->aRec.ipProto = ip_ptr->ip_p;
+  
 #ifdef DEBUG
   XSTRNCPY( s_ip_addr_str, inet_ntoa( ip_ptr->ip_src ), MAX_IP_ADDR_LEN );
   XSTRNCPY( d_ip_addr_str, inet_ntoa( ip_ptr->ip_dst ), MAX_IP_ADDR_LEN );
@@ -230,7 +214,7 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
    * process the IP packet
    */
 
-  if ( tr->ipProto EQ IPPROTO_UDP ) {
+  if ( tr->aRec.ipProto EQ IPPROTO_UDP ) {
 
     /*
      * udp decode
@@ -241,7 +225,7 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
     /*
      * done with packet, fall through
      */
-  } else if ( tr->ipProto EQ IPPROTO_TCP) {
+  } else if ( tr->aRec.ipProto EQ IPPROTO_TCP) {
 
     /*
      * tcp decode
@@ -253,7 +237,7 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
      * done with packet, fall through
      */
   
-  } else if ( tr->ipProto EQ IPPROTO_ICMP ) {
+  } else if ( tr->aRec.ipProto EQ IPPROTO_ICMP ) {
     /* icmp decode */
     if ( config->debug >= 5 ) {
       display( LOG_DEBUG, "ICMP packet" );
@@ -267,12 +251,14 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
 #endif
 
 #ifdef BSD_DERIVED
-    tr->sPort = icmp_ptr->icmp_code;
-    tr->dPort = icmp_ptr->icmp_type;
+    tr->aRec.sPort = icmp_ptr->icmp_code;
+    tr->aRec.dPort = icmp_ptr->icmp_type;
 #else
-    tr->sPort = icmp_ptr->code;
-    tr->dPort = icmp_ptr->type;
+    tr->aRec.sPort = icmp_ptr->code;
+    tr->aRec.dPort = icmp_ptr->type;
 #endif
+
+    /* XXX should process ICMP packets and log them */
 
     /*
      * done with packet, fall through
@@ -285,16 +271,6 @@ void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, str
   }
 
   /* XXX  we need to save all non-tcp traffic someplace */
-  //if ( config->trHead EQ NULL ) {
-  /* first traffic record */
-  //config->trHead = config->trTail = tr_tmp;
-  //} else {
-  //config->trTail->next = tr_tmp;
-  //tr_tmp->prev = config->trTail;
-  //config->trTail = tr_tmp;
-  //}
-
-  /* XXX add a timer check and purge tcp flow linked list of dead flows */
 
   /* cleanup, we will do nothing with this packet */
   return;
