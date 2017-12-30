@@ -181,6 +181,9 @@ typedef struct {
   char *pid_file;
   char *chroot_dir;
   char *log_dir;
+  char *pcap_fName;
+  char *wFlow_fName;
+  char *rFlow_fName;
   int display_to_pipe;
   FILE *log_st;
   FILE *syslog_st;
@@ -239,6 +242,7 @@ void ctime_prog( int signo );
 PRIVATE void print_version( void );
 PRIVATE void print_help( void );
 PRIVATE int start_collecting( void );
+PRIVATE int process_pcap( char *fName );
 PRIVATE int show_interfaces( void );
 pcap_handler get_handler( int datalink_type, char *device );
 void dl_ppp(u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
@@ -248,5 +252,7 @@ void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *
 void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, struct trafficRecord *tr, const u_char *packet );
 PRIVATE int avg_loop_count( int cur_loop_count );
 bpf_u_int32 get_iface_info( char *device );
+int writeFlowState( char *outFile );
+int readFlowState( char *inFile );
 
 #endif /* WSD_DOT_H */

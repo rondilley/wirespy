@@ -121,13 +121,16 @@ int main(int argc, char *argv[]) {
       {"help", no_argument, 0, 'h' },
       {"iniface", required_argument, 0, 'i' },
       {"chroot", required_argument, 0, 'c' },
+      {"read", required_argument, 0, 'r' },
       {"pidfile", required_argument, 0, 'p' },
       {"user", required_argument, 0, 'u' },
       {"group", required_argument, 0, 'g' },
+      {"wflow", required_argument, 0, 'W' },
+      {"rflow", required_argument, 0, 'R' },
       {0, no_argument, 0, 0}
     };
 
-    c = getopt_long(argc, argv, "vVd:hi:l:p:u:g:", long_options, &option_index);
+    c = getopt_long(argc, argv, "vVd:hi:l:p:u:g:r:R:W:", long_options, &option_index);
     if (c EQ -1)
       break;
 
@@ -163,9 +166,6 @@ int main(int argc, char *argv[]) {
 
     case 'p':
       /* define the location of the pid file used for rotating logs, etc */
-#ifdef DEBUG
-      fprintf( stderr, "MAXPATHLEN: %d\n", MAXPATHLEN );
-#endif
       pid_file = ( char * )XMALLOC( MAXPATHLEN+1 );
       XMEMSET( pid_file, 0, MAXPATHLEN+1 );
       strncpy( pid_file, optarg, MAXPATHLEN );
@@ -179,7 +179,32 @@ int main(int argc, char *argv[]) {
       strncpy( config->log_dir, optarg, MAXPATHLEN );
 
       break;
+      
+    case 'r':
+      /* define pcap file to read from */
+      config->pcap_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+      XMEMSET( config->pcap_fName, 0, MAXPATHLEN+1 );
+      strncpy( config->pcap_fName, optarg, MAXPATHLEN );
+      config->mode = MODE_INTERACTIVE;
+      
+      break;
 
+    case 'W':
+      /* define flow cache file to write to */
+      config->wFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+      XMEMSET( config->wFlow_fName, 0, MAXPATHLEN+1 );
+      strncpy( config->wFlow_fName, optarg, MAXPATHLEN );
+      
+      break;
+      
+    case 'R':
+      /* define flow cache file to read from */
+      config->rFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+      XMEMSET( config->rFlow_fName, 0, MAXPATHLEN+1 );
+      strncpy( config->rFlow_fName, optarg, MAXPATHLEN );
+      
+      break;
+      
     case 'c':
       /* chroot the process into the specific dir */
       chroot_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
@@ -328,20 +353,20 @@ int main(int argc, char *argv[]) {
 
       /* enable syslog */
       openlog( PROGNAME, LOG_CONS & LOG_PID, LOG_LOCAL0 );
+
+      /* write pid to file */
+#ifdef DEBUG
+      display( LOG_DEBUG, "PID: %s", pid_file );
+#endif
+      if ( create_pid_file( pid_file ) EQ FAILED ) {
+        display( LOG_ERR, "Creation of pid file failed" );
+        cleanup();
+        exit( EXIT_FAILURE );
+      }
     }
   } else {
     show_info();
     display( LOG_INFO, "Running in interactive mode" );
-  }
-
-  /* write pid to file */
-#ifdef DEBUG
-  display( LOG_DEBUG, "PID: %s", pid_file );
-#endif
-  if ( create_pid_file( pid_file ) EQ FAILED ) {
-    display( LOG_ERR, "Creation of pid file failed" );
-    cleanup();
-    exit( EXIT_FAILURE );
   }
 
   /* check dirs and files for danger */
@@ -420,9 +445,28 @@ int main(int argc, char *argv[]) {
   /* start collecting */
   display( LOG_INFO, "Listening" );
   
+  /****
+   ****
+   * GOGOGO
+   ****
+   ****/
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+      display( LOG_DEBUG, "Starting the packet processing" );
+#endif
+  
   /* lets get this show on the road */
-  start_collecting();
+  if ( config->pcap_fName != NULL )
+    process_pcap( config->pcap_fName );
+  else
+    start_collecting();
 
+  /****
+   ****
+   * STOPSTOPSTOP
+   ****
+   ****/
+  
   /* cleanup syslog */
   if ( config->mode != MODE_INTERACTIVE ) {
     closelog();
@@ -433,6 +477,11 @@ int main(int argc, char *argv[]) {
     pcap_close( config->pcap_handle );
   }
 
+  if ( home_dir != NULL )
+    XFREE( home_dir );
+  if ( pid_file != NULL )
+    XFREE( pid_file );
+    
   cleanup();
 
   return( EXIT_SUCCESS );
@@ -627,8 +676,12 @@ PRIVATE void print_help( void ) {
   printf( " -i|--iniface {int}   specify interface to listen on\n" );
   printf( " -l|--logdir {dir}    directory to create logs in (default: %s)\n", LOGDIR );
   printf( " -p|--pidfile {fname} specify pid file (default: %s)\n", PID_FILE );
+  printf( " -r|--read {fname}    specify pcap file to read\n" );
+  printf( " -R|--rflow {fname}   specify flow cache file to read\n" );
   printf( " -u|--user {user}     run as an alernate user\n" );
   printf( " -v|--version         display version information\n" );
+  printf( " -V|--verbose         log additional details about traffic\n" );
+  printf( " -W|--wflow {fname}   specify flow cache file to write\n" );
   printf( "\n" );
 }
 
@@ -676,7 +729,125 @@ void drop_privileges( void ) {
  ****/
 
 PRIVATE int process_pcap( char *fName ) {
-    
+  PRIVATE int ret;
+  PRIVATE bpf_u_int32 netp;
+  PRIVATE bpf_u_int32 maskp;
+  PRIVATE struct in_addr addr;
+  PRIVATE int i;
+  /* libpcap stuff */
+  PRIVATE char errbuf[PCAP_ERRBUF_SIZE];
+  XMEMSET( errbuf, 0, PCAP_ERRBUF_SIZE );
+  PRIVATE char pcap_filter_buf[1024];
+  XMEMSET( pcap_filter_buf, 0, 1024 );
+  PRIVATE pcap_t *handle;
+  pcap_handler handler;
+  struct pcap_stat packet_stats;
+  struct bpf_program fp;
+  int dlt;
+  const char *dlt_name;
+  char *tmp_dev;
+  /**/
+  int dynamic_loop_count = LOOP_PACKET_COUNT;
+  int prs, pds;
+  time_t start_time;
+  /* log stuff */
+  char log_buf[MAX_LOG_LINE];
+  XMEMSET( log_buf, 0, MAX_LOG_LINE );
+  char log_name[MAXPATHLEN+1];
+  XMEMSET( log_name, 0, MAXPATHLEN+1 );
+  size_t log_buf_len;
+  size_t write_count;
+  struct tm current_time;  
+
+  /* read flow cache */
+  if ( config->rFlow_fName != NULL )
+      readFlowState( config->rFlow_fName );
+  
+#ifdef DEBUG
+  if ( config->debug > 5 )
+      display( LOG_DEBUG, "Opening pcap file for read [%s]", fName );
+#endif
+  
+  /* open pcap file */
+  if ( ( handle = pcap_open_offline( fName, errbuf ) ) EQ NULL ) {
+    display( LOG_ERR, "Unable to open pcap file [%s] -- %s", fName, errbuf );
+    return FAILED;
+  } else {
+    display( LOG_INFO, "Opened pcap file: %s", fName );
+  }
+
+  /* stuff it in a list for emergency cleanups, unclean shutdowns seem to freak pcmcia nics out */
+  config->pcap_handle = handle;
+  
+  /****
+   *
+   * drop root privs
+   *
+   ****/
+  if ( ! config->debug ) // don't drop privs in debug mode so that core files are written
+    drop_privileges();
+
+  /* display dev info */
+  dlt = pcap_datalink(handle);
+  display( LOG_INFO, "Link Type: %d", dlt );
+
+  /* get the handler for this kind of packets */
+  if ( ( handler = get_handler( dlt, config->in_iface ) ) EQ 0 ) {
+    display( LOG_ERR, "Unable to determin proper data-link handler" );
+    return FAILED;
+  }
+
+  /* initialize current time struct */
+  localtime_r(&config->current_time, &current_time);
+  
+  /* create log file name */
+  snprintf( log_name, MAXPATHLEN, "%s.log", config->pcap_fName );
+
+#ifdef DEBUG
+  if ( config->debug >= 4 ) {
+    display( LOG_DEBUG, "Creating log file [%s]", log_name );
+  }
+#endif
+
+  /* open new packet log file */
+  if ( ( config->log_st = fopen( log_name, "w" ) ) EQ NULL ) {
+    display( LOG_ERR, "Unable to open log file [%s]", log_name );
+    quit = TRUE;
+    return FAILED;
+  }
+
+  /* init hashes */
+  config->tcpFlowHash = initHash( 52 );
+  
+  /* save start time */
+  start_time = config->current_time;
+
+  /* drop into pcap loop */
+  if ( pcap_loop( handle, 0, handler, NULL ) EQ FAILED ) {
+    display( LOG_ERR, "pcap_loop error [%s]", errbuf );
+  } else {
+    if ( errbuf[0] != 0 ) {
+      display( LOG_ERR, "errbuf is not empty [%s]", errbuf );
+      errbuf[0] = 0;
+    }
+
+    fclose( config->log_st );
+
+    /* empty out the traffic report linked lists */
+    cleanupTrafficReports();
+
+    /* empty out the tcp flow linked lists */
+    cleanupTcpFlows();
+  }
+
+  /* write flow cache */
+  if ( config->wFlow_fName != NULL )
+      writeFlowState( config->wFlow_fName );
+  
+  /* cleanup */
+  //pcap_freecode( &fp );
+
+  return TRUE;  
 }
 
 /****
@@ -962,7 +1133,7 @@ PRIVATE int start_collecting( void ) {
   }
 
   /* cleanup */
-  pcap_freecode( &fp );
+  //pcap_freecode( &fp );
 
   display( LOG_INFO, "Received: %d, Dropped: %d", config->pcap_rec, config->pcap_drop );
   
@@ -979,11 +1150,22 @@ PRIVATE void cleanup( void ) {
   int i = 0;
 
   XFREE( config->hostname );
-  XFREE( config->in_dev_net_addr_str );
-  XFREE( config->in_dev_net_mask_str );
-  XFREE( config->in_dev_ip_addr_str );
-  XFREE( config->in_iface );
-
+  if ( config->in_dev_net_addr_str != NULL )
+    XFREE( config->in_dev_net_addr_str );
+  if ( config->in_dev_net_mask_str != NULL )
+    XFREE( config->in_dev_net_mask_str );
+  if ( config->in_dev_ip_addr_str != NULL )
+    XFREE( config->in_dev_ip_addr_str );
+  if ( config->in_iface != NULL )
+    XFREE( config->in_iface );
+  if ( config->pcap_fName != NULL )
+    XFREE( config->pcap_fName );
+  if ( config->log_dir != NULL )
+    XFREE( config->log_dir );
+  if ( config->wFlow_fName != NULL )
+    XFREE( config->wFlow_fName );
+  if ( config->rFlow_fName != NULL )
+    XFREE( config->rFlow_fName );
   if ( config->tcpFlowHash != NULL )
       freeHash( config->tcpFlowHash );
   
@@ -1144,4 +1326,34 @@ PRIVATE int avg_loop_count( int cur_loop_count ) {
   }
 
   return ( total / count );
+}
+
+/****
+ * 
+ * save flow state to disk
+ * 
+ ****/
+
+int writeFlowState( char *outFile ) {
+#ifdef DEBUG
+    if ( config->debug >= 1 )
+        display( LOG_DEBUG, "Writing flow cache to [%s]", outFile );
+#endif
+    
+    return TRUE;
+}
+
+/****
+ *
+ * read flow state from disk
+ * 
+ ****/
+
+int readFlowState( char *inFile ) {
+#ifdef DEBUG
+    if ( config->debug >= 1 )
+        display( LOG_DEBUG, "Reading flow cache from [%s]", inFile );
+#endif
+    
+    return TRUE;
 }

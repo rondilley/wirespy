@@ -9,6 +9,20 @@ http://www.uberadmin.com/wsd/
 
 == Why use it?
 
+== How to use it?
+
+syntax: wsd [options]
+ -c|--chroot {dir}    chroot into directory
+ -d|--debug (0-9)     enable debugging info
+ -g|--group {group}   run as an alternate group
+ -h|--help            this info
+ -i|--iniface {int}   specify interface to listen on
+ -l|--logdir {dir}    directory to create logs in (default: /var/log/wsd)
+ -p|--pidfile {fname} specify pid file (default: /var/run/wsd.pid)
+ -u|--user {user}     run as an alernate user
+ -v|--version         display version information
+ -V|--verbose         log additional details about traffic
+
 == Security Implications
 
 Assume that there are errors in the wsd source that

@@ -1,10 +1,9 @@
-psmd TODO list
+wsd TODO list
 ==============
 
 Short-term:
 -----------
 * Ability to summarize TCP sessions
-* PCAP file processing
 
 Long-term:
 ----------
