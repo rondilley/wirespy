@@ -181,6 +181,7 @@ typedef struct {
   char *pid_file;
   char *chroot_dir;
   char *log_dir;
+  char *log_fName;
   char *pcap_fName;
   char *wFlow_fName;
   char *rFlow_fName;

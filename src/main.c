@@ -115,6 +115,7 @@ int main(int argc, char *argv[]) {
     int option_index = 0;
     static struct option long_options[] = {
       {"logdir", required_argument, 0, 'l' },
+      {"logfile", required_argument, 0, 'L' },
       {"version", no_argument, 0, 'v' },
       {"verbose", no_argument, 0, 'V' },
       {"debug", required_argument, 0, 'd' },
@@ -130,7 +131,7 @@ int main(int argc, char *argv[]) {
       {0, no_argument, 0, 0}
     };
 
-    c = getopt_long(argc, argv, "vVd:hi:l:p:u:g:r:R:W:", long_options, &option_index);
+    c = getopt_long(argc, argv, "vVd:hi:l:L:p:u:g:r:R:W:", long_options, &option_index);
     if (c EQ -1)
       break;
 
@@ -177,6 +178,14 @@ int main(int argc, char *argv[]) {
       config->log_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
       XMEMSET( config->log_dir, 0, MAXPATHLEN+1 );
       strncpy( config->log_dir, optarg, MAXPATHLEN );
+
+      break;
+      
+    case 'L':
+      /* define the file, overrides -l */
+      config->log_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+      XMEMSET( config->log_fName, 0, MAXPATHLEN+1 );
+      strncpy( config->log_fName, optarg, MAXPATHLEN );
 
       break;
       
@@ -675,6 +684,7 @@ PRIVATE void print_help( void ) {
   printf( " -h|--help            this info\n" );
   printf( " -i|--iniface {int}   specify interface to listen on\n" );
   printf( " -l|--logdir {dir}    directory to create logs in (default: %s)\n", LOGDIR );
+  printf( " -L|--logfile {fname} specify log file instead of dynamic generated filenames\n" );
   printf( " -p|--pidfile {fname} specify pid file (default: %s)\n", PID_FILE );
   printf( " -r|--read {fname}    specify pcap file to read\n" );
   printf( " -R|--rflow {fname}   specify flow cache file to read\n" );
@@ -801,7 +811,10 @@ PRIVATE int process_pcap( char *fName ) {
   localtime_r(&config->current_time, &current_time);
   
   /* create log file name */
-  snprintf( log_name, MAXPATHLEN, "%s.log", config->pcap_fName );
+  if ( config->log_fName != NULL )
+    strncpy( log_name, config->log_fName, MAXPATHLEN );
+  else
+    snprintf( log_name, MAXPATHLEN, "%s.log", config->pcap_fName );
 
 #ifdef DEBUG
   if ( config->debug >= 4 ) {
@@ -1162,6 +1175,8 @@ PRIVATE void cleanup( void ) {
     XFREE( config->pcap_fName );
   if ( config->log_dir != NULL )
     XFREE( config->log_dir );
+  if ( config->log_fName != NULL )
+    XFREE( config->log_fName );
   if ( config->wFlow_fName != NULL )
     XFREE( config->wFlow_fName );
   if ( config->rFlow_fName != NULL )
