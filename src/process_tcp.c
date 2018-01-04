@@ -1112,8 +1112,7 @@ int readFlowState( char *in_fName ) {
         tfPtr = (struct tcpFlow *)XMALLOC( sizeof( struct tcpFlow ) );
         XMEMSET( tfPtr, 0, sizeof( struct tcpFlow ) );
         XMEMCPY( tfPtr, &tmpFlowBuf, sizeof( struct tcpFlowCache ) );
-        
-        
+
         /* insert new traffic flow into hash */
         if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
 #ifdef DEBUG

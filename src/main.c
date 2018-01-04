@@ -846,9 +846,6 @@ PRIVATE int process_pcap( char *fName ) {
     return FAILED;
   }
 
-  /* save start time */
-  start_time = config->current_time;
-
   /* drop into pcap loop */
   if ( pcap_loop( handle, 0, handler, NULL ) EQ FAILED ) {
     display( LOG_ERR, "pcap_loop error [%s]", errbuf );

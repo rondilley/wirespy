@@ -133,9 +133,10 @@ void processUdpPacket( struct trafficRecord *tr, const u_char *packet ) {
            tr->wire_usec,
 #else
 #ifdef OPENBSD
-  fprintf( config->log_st, "[%lu.%06lu] ",
-           tr->wire_sec,
-           tr->wire_usec );
+  fprintf( config->log_st, "[%lu.",
+	   tr->wire_sec );
+  fprintf( config->log_st, "%06lu] ",
+	   tr->wire_usec );
   fprintf( config->log_st, "%17s->%-17s %16s:%-5u -> %16s:%-5u UDP\n",
 #else
   fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u -> %16s:%-5u UDP\n",
