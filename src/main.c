@@ -789,10 +789,6 @@ PRIVATE int process_pcap( char *fName ) {
   size_t write_count;
   struct tm current_time;  
 
-  /* read flow cache */
-  if ( config->rFlow_fName != NULL )
-      readFlowState( config->rFlow_fName );
-  
 #ifdef DEBUG
   if ( config->debug > 5 )
       display( LOG_DEBUG, "Opening pcap file for read [%s]", fName );
