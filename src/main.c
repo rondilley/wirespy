@@ -508,9 +508,10 @@ int main(int argc, char *argv[]) {
   if ( pid_file != NULL )
     XFREE( pid_file );
 
-  if ( config->wFlow_fName != NULL )
+  if ( config->wFlow_fName != NULL ) {
     writeFlowState( config->wFlow_fName );
-
+  }
+  
   cleanup();
 
   return( EXIT_SUCCESS );

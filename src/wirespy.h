@@ -190,6 +190,7 @@ typedef struct {
   unsigned long pcap_rec;
   unsigned long pcap_drop;
   time_t current_time;
+  time_t last_packet_time;
   pid_t cur_pid;
   /* traffic specific items */
   struct tcpFlow *tfHead;

@@ -184,7 +184,7 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
 
   /* clear traffic report */
   XMEMSET( &tr, 0, sizeof( struct trafficRecord ) );
-  tr.wire_sec = (time_t)(header->ts.tv_sec);
+  config->last_packet_time = tr.wire_sec = (time_t)(header->ts.tv_sec);
   tr.wire_usec = (time_t)(header->ts.tv_usec);
   
 #ifdef DEBUG
@@ -260,7 +260,7 @@ void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *
 
   /* clear traffic report */
   XMEMSET( &tr, 0, sizeof( struct trafficRecord ) );
-  tr.wire_sec = (time_t)(header->ts.tv_sec);
+  config->last_packet_time = tr.wire_sec = (time_t)(header->ts.tv_sec);
   tr.wire_usec = (time_t)(header->ts.tv_usec);
 
 #ifdef DEBUG

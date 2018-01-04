@@ -62,7 +62,6 @@ void pruneFlows( void ) {
     PRIVATE char s_ip_addr_str[MAX_IP_ADDR_LEN+1];
     PRIVATE char d_ip_addr_str[MAX_IP_ADDR_LEN+1];
     PRIVATE struct tcpFlow *tfPtr, *tmpTfPtr;
-    time_t currentTime = time( NULL );
     struct tm *tmpTm;
     PRIVATE struct trafficRecord *tr_tmp, *tmpTrPtr;
     char tmpBuf[4096];
@@ -78,13 +77,13 @@ void pruneFlows( void ) {
     
     tfPtr = config->tfHead;
     while ( tfPtr != NULL ) {
-      if ( ( ( ( tfPtr->lastUpdate + 30 ) < currentTime ) ) && ( tfPtr->status EQ TCP_FLOW_CLOSED ) ) { // flow closed and no traffic for too long
+      if ( ( ( ( tfPtr->lastUpdate + 30 ) < config->last_packet_time ) ) && ( tfPtr->status EQ TCP_FLOW_CLOSED ) ) { // flow closed and no traffic for too long
 	/* old traffic flow, remove it */
         tmpTfPtr = tfPtr;
         tfPtr = tfPtr->next;
         reportTcpFlow( tmpTfPtr );
         
-      } else if ( ( tfPtr->lastUpdate + 600 ) < currentTime ) { // flow not closed but no traffic for too long
+      } else if ( ( tfPtr->lastUpdate + 600 ) < config->last_packet_time ) { // flow not closed but no traffic for too long
         /* old traffic flow, remove it */
 
 #ifdef DEBUG
@@ -982,6 +981,8 @@ int writeFlowState( char *out_fName ) {
   struct tcpFlow *tfPtr, *tmpTfPtr;
   FILE *outFile = NULL;
   size_t f = 0, r = 0, rCount;
+  
+  pruneFlows();
   
 #ifdef DEBUG
   if ( config->debug >= 1 )
