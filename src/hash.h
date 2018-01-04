@@ -40,9 +40,9 @@
 #endif
 
 #include <common.h>
+#include "wirespy.h"
 #include "mem.h"
 #include "util.h"
-#include "wsd.h"
 
 /****
  *

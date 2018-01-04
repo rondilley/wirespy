@@ -2,7 +2,7 @@
  *
  * Wirespy
  * 
- * Copyright (c) 2006-2017, Ron Dilley
+ * Copyright (c) 2006-2018, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -52,6 +52,16 @@ PUBLIC Config_t *config = NULL;
 
 extern int errno;
 extern char **environ;
+
+/****
+ * 
+ * external functions
+ * 
+ ****/
+
+extern int writeFlowState( char *out_fName );
+extern int readFlowState( char *in_fName );
+extern void cleanupTcpFlows( void );
 
 /****
  *
@@ -459,6 +469,13 @@ int main(int argc, char *argv[]) {
    * GOGOGO
    ****
    ****/
+  
+  /* init hashes */
+  config->tcpFlowHash = initHash( 52 );
+  
+  if ( config->rFlow_fName != NULL )
+    readFlowState( config->rFlow_fName );
+  
 #ifdef DEBUG
   if ( config->debug >= 1 )
       display( LOG_DEBUG, "Starting the packet processing" );
@@ -490,8 +507,11 @@ int main(int argc, char *argv[]) {
     XFREE( home_dir );
   if ( pid_file != NULL )
     XFREE( pid_file );
-    
-  cleanup();
+
+  if ( config->wFlow_fName != NULL )
+    writeFlowState( config->wFlow_fName );
+  else
+    cleanup();
 
   return( EXIT_SUCCESS );
 }
@@ -829,9 +849,6 @@ PRIVATE int process_pcap( char *fName ) {
     return FAILED;
   }
 
-  /* init hashes */
-  config->tcpFlowHash = initHash( 52 );
-  
   /* save start time */
   start_time = config->current_time;
 
@@ -845,9 +862,6 @@ PRIVATE int process_pcap( char *fName ) {
     }
 
     fclose( config->log_st );
-
-    /* empty out the traffic report linked lists */
-    cleanupTrafficReports();
 
     /* empty out the tcp flow linked lists */
     cleanupTcpFlows();
@@ -1032,9 +1046,6 @@ PRIVATE int start_collecting( void ) {
     return FAILED;
   }
 
-  /* init hashes */
-  config->tcpFlowHash = initHash( 52 );
-  
   /* loop through pcap loops */
   for( ;; ) {
     /* save start time */
@@ -1107,9 +1118,6 @@ PRIVATE int start_collecting( void ) {
       
       fclose( config->log_st );
 
-      /* empty out the traffic report linked lists */
-      cleanupTrafficReports();
-
       /* empty out the tcp flow linked lists */
       cleanupTcpFlows();
 
@@ -1162,7 +1170,8 @@ PRIVATE int start_collecting( void ) {
 PRIVATE void cleanup( void ) {
   int i = 0;
 
-  XFREE( config->hostname );
+  if ( config->hostname != NULL )
+    XFREE( config->hostname );
   if ( config->in_dev_net_addr_str != NULL )
     XFREE( config->in_dev_net_addr_str );
   if ( config->in_dev_net_mask_str != NULL )
@@ -1181,98 +1190,16 @@ PRIVATE void cleanup( void ) {
     XFREE( config->wFlow_fName );
   if ( config->rFlow_fName != NULL )
     XFREE( config->rFlow_fName );
-  if ( config->tcpFlowHash != NULL )
-      freeHash( config->tcpFlowHash );
   
-  cleanupTrafficReports();
   cleanupTcpFlows();
 
-#ifdef MEM_DEBUG
+  if ( config->tcpFlowHash != NULL )
+    freeHash( config->tcpFlowHash );
+
+  #ifdef MEM_DEBUG
   XFREE_ALL();
 #endif
   XFREE( config );
-}
-
-/****
- *
- * cleanup traffic report linked lists
- *
- ****/
-
-void cleanupTrafficReports( void ) {
-  int i = 0;
-
-
-}
-
-/****
- *
- * cleanup tcp flow linked lists
- *
- ****/
-
-void cleanupTcpFlows( void ) {
-  struct tcpFlow *tfPtr, *tmpTfPtr;
-  int f = 0;
-  int r = 0;
-
-  tfPtr = config->tfHead;
-  while ( tfPtr != NULL ) {
-#ifdef DEBUG
-    if ( config->debug >= 4 )
-      display( LOG_DEBUG, "Removing records in old flow" );
-#endif
-
-    /* empty the traffic records related to this flow */
-        
-    while( tfPtr->head != NULL ) {
-#ifdef DEBUG
-      r++;
-#endif
-      if ( tfPtr->head EQ tfPtr->tail ) {
-        XFREE( tfPtr->head );
-        tfPtr->head = NULL;
-      } else {
-        tfPtr->tail = tfPtr->tail->prev;
-        XFREE( tfPtr->tail->next );
-      }
-    }
-    tfPtr->head = tfPtr->tail = NULL;
-
-#ifdef DEBUG
-    if ( config->debug >= 4 ) 
-      display( LOG_DEBUG, "Removing old flow" );
-#endif
-
-    tmpTfPtr = tfPtr;
-
-    if ( tfPtr EQ config->tfHead ) {
-      config->tfHead = tfPtr->next;
-    } else {
-      tfPtr->prev->next = tfPtr->next;
-    }
-
-    if ( tfPtr EQ config->tfTail ) {
-      config->tfTail = tfPtr->prev;
-    } else {
-      tfPtr->next->prev = tfPtr->prev;
-    }
-
-    /* remove hash flow records */
-    deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ) );
-    deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecIn, sizeof( struct trafficAddressRecord ) );
-
-    /* next flow record */
-    f++;
-    tfPtr = tfPtr->next;
-    XFREE( tmpTfPtr );
-    config->flowCount--;
-  }
-
-#ifdef DEBUG
-  if ( config->debug >= 1 )
-    display( LOG_DEBUG, "[%d] tcp flow records and [%d] tcp traffic records deleted", f, r );
-#endif
 }
 
 /****
@@ -1341,34 +1268,4 @@ PRIVATE int avg_loop_count( int cur_loop_count ) {
   }
 
   return ( total / count );
-}
-
-/****
- * 
- * save flow state to disk
- * 
- ****/
-
-int writeFlowState( char *outFile ) {
-#ifdef DEBUG
-    if ( config->debug >= 1 )
-        display( LOG_DEBUG, "Writing flow cache to [%s]", outFile );
-#endif
-    
-    return TRUE;
-}
-
-/****
- *
- * read flow state from disk
- * 
- ****/
-
-int readFlowState( char *inFile ) {
-#ifdef DEBUG
-    if ( config->debug >= 1 )
-        display( LOG_DEBUG, "Reading flow cache from [%s]", inFile );
-#endif
-    
-    return TRUE;
 }

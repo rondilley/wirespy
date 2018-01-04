@@ -247,14 +247,15 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 
     /* copy source and dest addresses into flow */
     XMEMCPY( &tfPtr->aRecOut, &tr->aRec, sizeof( struct trafficAddressRecord ) );
-    XMEMCPY( &tfPtr->aRecIn.sIp, &tr->aRec.dIp, sizeof( struct in_addr ) );
-    XMEMCPY( &tfPtr->aRecIn.dIp, &tr->aRec.sIp, sizeof( struct in_addr ) );
-    tfPtr->aRecIn.ipProto = tr->aRec.ipProto;
-    XMEMCPY( &tfPtr->aRecIn.sPort, &tr->aRec.dPort, sizeof( u_short ) );
-    XMEMCPY( &tfPtr->aRecIn.dPort, &tr->aRec.sPort, sizeof( u_short ) );
+    
     XMEMCPY( &tfPtr->aRecIn.sMac, &tr->aRec.dMac, ETHER_ADDR_LEN );
     XMEMCPY( &tfPtr->aRecIn.dMac, &tr->aRec.sMac, ETHER_ADDR_LEN );
     tfPtr->aRecIn.ethProto = tr->aRec.ethProto;
+    XMEMCPY( &tfPtr->aRecIn.sIp, &tr->aRec.dIp, sizeof( struct in_addr ) );
+    XMEMCPY( &tfPtr->aRecIn.dIp, &tr->aRec.sIp, sizeof( struct in_addr ) );
+    tfPtr->aRecIn.ipProto = tr->aRec.ipProto;
+    tfPtr->aRecIn.sPort = tr->aRec.dPort;
+    tfPtr->aRecIn.dPort = tr->aRec.sPort;
      
     /* update out size */
     tfPtr->clientIsn = tr->seq;
@@ -269,10 +270,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
     
     /* increment outbound byte count */
     tfPtr->bytesOut += tr->size;
-    
-    /* insert traffic record into linked list */
-    insertTrafficRecord( tfPtr, tr );
- 
+
     /* insert tcp flow into linked list */
 
 #ifdef DEBUG
@@ -283,21 +281,26 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
     /* insert new traffic flow into hash */
     if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
 #ifdef DEBUG
-      XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)&tr->aRec.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
-      XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)&tr->aRec.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
-      XSTRNCPY( s_ip_addr_str, inet_ntoa( tr->aRec.sIp ), MAX_IP_ADDR_LEN );
-      XSTRNCPY( d_ip_addr_str, inet_ntoa( tr->aRec.dIp ), MAX_IP_ADDR_LEN );
+      XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecOut.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+      XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecOut.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+      XSTRNCPY( s_ip_addr_str, inet_ntoa( tfPtr->aRecOut.sIp ), MAX_IP_ADDR_LEN );
+      XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecOut.dIp ), MAX_IP_ADDR_LEN );
       display( LOG_DEBUG, "Problem inserting inbound address record [%s:%s:%u-%s:%s:%u]",
                s_eth_addr_str,
                s_ip_addr_str,
-               tr->aRec.sPort,
+               tfPtr->aRecOut.sPort,
                d_eth_addr_str,
                d_ip_addr_str,
-               tr->aRec.dPort
+               tfPtr->aRecOut.dPort
 	     );
-#else
-        display( LOG_ERR, "Problem inserting outbound address record into hash\n" );
 #endif
+
+      XFREE( tfPtr );
+      /* log the packet */
+      if( config->verbose )
+        logTcpPacket( tfPtr, tcp_ptr, tr, FLOW_OUTBOUND );
+
+      return;
         
     } else {
 #ifdef DEBUG
@@ -307,25 +310,33 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 
       if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecIn, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
 #ifdef DEBUG
-        XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)&tr->aRec.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
-        XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)&tr->aRec.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
-        XSTRNCPY( s_ip_addr_str, inet_ntoa( tr->aRec.sIp ), MAX_IP_ADDR_LEN );
-        XSTRNCPY( d_ip_addr_str, inet_ntoa( tr->aRec.dIp ), MAX_IP_ADDR_LEN );
+        XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecIn.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+        XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecIn.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+        XSTRNCPY( s_ip_addr_str, inet_ntoa( tfPtr->aRecIn.sIp ), MAX_IP_ADDR_LEN );
+        XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecIn.dIp ), MAX_IP_ADDR_LEN );
         display( LOG_DEBUG, "Problem inserting inbound address record [%s:%s:%u-%s:%s:%u]",
                  s_eth_addr_str,
                  s_ip_addr_str,
-                 tr->aRec.sPort,
+                 tfPtr->aRecIn.sPort,
                  d_eth_addr_str,
                  d_ip_addr_str,
-                 tr->aRec.dPort
+                 tfPtr->aRecIn.dPort
                );
-#else
-          display( LOG_ERR, "Problem inserting inbound address record into hash\n" );
 #endif
-          
+
+        XFREE( tfPtr );
+        /* log the packet */
+        if( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, FLOW_OUTBOUND );
+
+        return;
       }
     }
     
+        
+    /* insert traffic record into linked list */
+    insertTrafficRecord( tfPtr, tr );
+ 
     if ( config->tfHead EQ NULL ) {
       config->tfHead = config->tfTail = tfPtr;
     } else {
@@ -654,8 +665,6 @@ int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr ) {
     tfPtr->tail = tmpTrPtr;
   }
 
-  tfPtr->recordCount++;
-
   return TRUE;
 }
 
@@ -809,6 +818,70 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
 }
 
 /****
+ * 
+ * show flow record
+ * 
+ ****/
+
+int showTcpFlow( struct tcpFlow *tfPtr ) {
+    PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+    PRIVATE char d_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+    PRIVATE char s_ip_addr_str[MAX_IP_ADDR_LEN+2];
+    PRIVATE char d_ip_addr_str[MAX_IP_ADDR_LEN+2];
+    struct tm *tmpTm;
+    char tmpBuf[4096];
+
+    /*
+     * report on flow
+     */
+
+    XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecOut.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+    XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)&tfPtr->aRecOut.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+    XSTRNCPY( s_ip_addr_str, inet_ntoa( tfPtr->aRecOut.sIp ), MAX_IP_ADDR_LEN );
+    XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecOut.dIp ), MAX_IP_ADDR_LEN );
+
+    tmpTm = localtime( &tfPtr->firstUpdate );
+
+#if SIZEOF_SIZE_T == 8
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu\n",
+#else
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u\n",
+#endif
+              tmpTm->tm_year+1900,
+              tmpTm->tm_mon+1,
+              tmpTm->tm_mday,
+              tmpTm->tm_hour,
+              tmpTm->tm_min,
+              tmpTm->tm_sec,
+              s_eth_addr_str,
+              s_ip_addr_str,
+              tfPtr->aRecOut.sPort,
+              d_eth_addr_str,
+              d_ip_addr_str,
+              tfPtr->aRecOut.dPort,
+              tfPtr->lastUpdate - tfPtr->firstUpdate,
+              tfPtr->packetsIn,
+              tfPtr->packetsOut,
+              tfPtr->bytesIn,
+              tfPtr->bytesOut
+            );
+
+    display( LOG_INFO, "%s", tmpBuf );
+    
+    return TRUE;  
+}
+
+/****
+ * 
+ * show traffic record
+ * 
+ ****/
+
+int showTrafficRecord( struct trafficRecord *trPtr ) {
+    
+}
+
+/****
  *
  * report and delete flow
  * 
@@ -897,4 +970,288 @@ int reportTcpFlow( struct tcpFlow *tfPtr ) {
     config->flowCount--;
     
     return TRUE;
+}
+
+/****
+ * 
+ * save flow state to disk
+ * 
+ ****/
+
+int writeFlowState( char *out_fName ) {
+  struct tcpFlow *tfPtr, *tmpTfPtr;
+  FILE *outFile = NULL;
+  size_t f = 0, r = 0, rCount;
+  
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+    display( LOG_DEBUG, "Writing flow cache to [%s]", out_fName );
+#endif
+
+  if ( ( outFile = fopen( out_fName, "w" ) ) EQ NULL ) {
+    display( LOG_ERR, "Unable top open cache file for write [%s]\n", out_fName );
+    return FAILED;
+  }
+  
+  tfPtr = config->tfHead;
+  while ( tfPtr != NULL ) {
+#ifdef DEBUG
+    if ( config->debug >= 4 )
+      display( LOG_DEBUG, "Removing records in flow" );
+#endif
+    
+#ifdef DEBUG
+        if ( config->debug >= 4 )
+            showTcpFlow( tfPtr );
+#endif
+
+    /* write flow record */
+    fwrite( tfPtr, sizeof( struct tcpFlowCache ), 1, outFile );
+    f++;
+    
+    /* empty the traffic records related to this flow */
+    rCount = 0;    
+    while( tfPtr->head != NULL ) {
+
+        if ( tfPtr->head EQ tfPtr->tail ) {
+        fwrite( tfPtr->head, sizeof( struct trafficRecordCache ), 1, outFile );
+        XFREE( tfPtr->head );
+        r++;
+        rCount++;
+        tfPtr->head = NULL;
+      } else {
+        tfPtr->tail = tfPtr->tail->prev;
+        fwrite( tfPtr->tail->next, sizeof( struct trafficRecordCache ), 1, outFile );
+        r++;
+        rCount++;
+        XFREE( tfPtr->tail->next );
+      }
+    }
+    tfPtr->head = tfPtr->tail = NULL;
+
+    if ( ( tfPtr->packetsIn + tfPtr->packetsOut ) != rCount ) {
+        display( LOG_ERR, "Flow reported [%d] records but only saved [%d] records", ( tfPtr->packetsIn + tfPtr->packetsOut ), rCount );
+    }
+    
+#ifdef DEBUG
+    if ( config->debug >= 4 ) 
+      display( LOG_DEBUG, "Removing flow" );
+#endif
+
+    tmpTfPtr = tfPtr;
+
+    if ( tfPtr EQ config->tfHead ) {
+      config->tfHead = tfPtr->next;
+    } else {
+      tfPtr->prev->next = tfPtr->next;
+    }
+
+    if ( tfPtr EQ config->tfTail ) {
+      config->tfTail = tfPtr->prev;
+    } else {
+      tfPtr->next->prev = tfPtr->prev;
+    }
+
+    /* remove hash flow records */
+    deleteHashRecord( config->tcpFlowHash, (char *)&tmpTfPtr->aRecOut, sizeof( struct trafficAddressRecord ) );
+    deleteHashRecord( config->tcpFlowHash, (char *)&tmpTfPtr->aRecIn, sizeof( struct trafficAddressRecord ) );
+
+    /* next flow record */
+    tfPtr = tfPtr->next;
+    XFREE( tmpTfPtr );
+    config->flowCount--;
+  }
+  
+  fclose( outFile );
+
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+    display( LOG_DEBUG, "[%d] tcp flow records and [%d] tcp traffic records cached", f, r );
+#endif
+  return TRUE;
+}
+
+/****
+ *
+ * read flow state from disk
+ * 
+ ****/
+
+int readFlowState( char *in_fName ) {
+    struct tcpFlowCache tmpFlowBuf;
+    struct trafficRecord tmpRecBuf;
+    struct tcpFlow *tfPtr;
+    FILE *inFile = NULL;
+    size_t f = 0, r = 0, i, ret;
+#ifdef DEBUG
+    PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+    PRIVATE char d_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+    PRIVATE char s_ip_addr_str[MAX_IP_ADDR_LEN+2];
+    PRIVATE char d_ip_addr_str[MAX_IP_ADDR_LEN+2];
+#endif
+  
+    XMEMSET( &tmpRecBuf, 0, sizeof( struct trafficRecord ) );
+    
+#ifdef DEBUG
+    if ( config->debug >= 1 )
+        display( LOG_DEBUG, "Reading flow cache from [%s]", in_fName );
+#endif
+    
+    if ( ( inFile = fopen( in_fName, "r" ) ) EQ NULL ) {
+        display( LOG_ERR, "Unable to open flow cache [%s]", in_fName );
+        return FAILED;
+    }
+    
+    while( ( ret = fread( &tmpFlowBuf, sizeof( struct tcpFlowCache ), 1, inFile ) ) EQ 1 ) {
+    
+        /* grow the hash if needed */
+        config->tcpFlowHash = dyGrowHash( config->tcpFlowHash );
+        
+        /* create new tcp flow record */
+        tfPtr = (struct tcpFlow *)XMALLOC( sizeof( struct tcpFlow ) );
+        XMEMSET( tfPtr, 0, sizeof( struct tcpFlow ) );
+        XMEMCPY( tfPtr, &tmpFlowBuf, sizeof( struct tcpFlowCache ) );
+        
+        
+        /* insert new traffic flow into hash */
+        if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
+#ifdef DEBUG
+            XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)tfPtr->aRecOut.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+            XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)tfPtr->aRecOut.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+            XSTRNCPY( s_ip_addr_str, inet_ntoa( tfPtr->aRecOut.sIp ), MAX_IP_ADDR_LEN );
+            XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecOut.dIp ), MAX_IP_ADDR_LEN );
+            display( LOG_DEBUG, "Problem inserting outbound address record [%s->%s(%u)-%s->%s(%u)-%u->%u]",
+                     s_eth_addr_str,
+                     d_eth_addr_str,
+                     tfPtr->aRecOut.ethProto,
+                     s_ip_addr_str,
+                     d_ip_addr_str,
+                     tfPtr->aRecOut.ipProto,
+                     tfPtr->aRecOut.sPort,
+                     tfPtr->aRecOut.dPort
+                );
+#endif  
+        }
+        
+        if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecIn, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
+#ifdef DEBUG
+            XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)tfPtr->aRecIn.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+            XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)tfPtr->aRecIn.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+            XSTRNCPY( s_ip_addr_str, inet_ntoa( tfPtr->aRecIn.sIp ), MAX_IP_ADDR_LEN );
+            XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecIn.dIp ), MAX_IP_ADDR_LEN );
+            display( LOG_DEBUG, "Problem inserting inbound address record [%s->%s(%u)-%s->%s(%u)-%u->%u]",
+                    s_eth_addr_str,
+                    d_eth_addr_str,
+                    tfPtr->aRecIn.ethProto,
+                    s_ip_addr_str,
+                    d_ip_addr_str,
+                    tfPtr->aRecIn.ipProto,
+                    tfPtr->aRecIn.sPort,
+                    tfPtr->aRecIn.dPort
+                );
+#endif            
+        } 
+        
+        if ( config->tfHead EQ NULL ) {
+            config->tfHead = config->tfTail = tfPtr;
+        } else {
+            config->tfTail->next = tfPtr;
+            tfPtr->prev = config->tfTail;
+            config->tfTail = tfPtr;
+        }
+        config->flowCount++;
+        f++;
+        
+        for( i = 0; i < ( tmpFlowBuf.packetsIn + tmpFlowBuf.packetsOut ); i++, r++ ) {
+            if ( ( ret = fread( &tmpRecBuf, sizeof( struct trafficRecordCache ), 1, inFile ) ) EQ 0 ) {
+                display( LOG_ERR, "Problem while reading record cache" );
+                return FAILED;
+            }
+            
+            /* insert traffic record into linked list */
+            insertTrafficRecord( tfPtr, &tmpRecBuf );
+        }
+
+#ifdef DEBUG
+        if ( config->debug >= 4 )
+            showTcpFlow( tfPtr );
+#endif
+    }
+    
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+    display( LOG_DEBUG, "[%d] tcp flow records and [%d] tcp traffic records read from cache", f, r );
+#endif  
+    
+    return TRUE;
+}
+
+/****
+ *
+ * cleanup tcp flow linked lists
+ *
+ ****/
+
+void cleanupTcpFlows( void ) {
+  struct tcpFlow *tfPtr, *tmpTfPtr;
+  int f = 0;
+  int r = 0;
+
+  tfPtr = config->tfHead;
+  while ( tfPtr != NULL ) {
+#ifdef DEBUG
+    if ( config->debug >= 4 )
+      display( LOG_DEBUG, "Removing records in flow" );
+#endif
+
+    /* empty the traffic records related to this flow */
+        
+    while( tfPtr->head != NULL ) {
+#ifdef DEBUG
+      r++;
+#endif
+      if ( tfPtr->head EQ tfPtr->tail ) {
+        XFREE( tfPtr->head );
+        tfPtr->head = NULL;
+      } else {
+        tfPtr->tail = tfPtr->tail->prev;
+        XFREE( tfPtr->tail->next );
+      }
+    }
+    tfPtr->head = tfPtr->tail = NULL;
+
+#ifdef DEBUG
+    if ( config->debug >= 4 ) 
+      display( LOG_DEBUG, "Removing flow" );
+#endif
+
+    tmpTfPtr = tfPtr;
+
+    if ( tfPtr EQ config->tfHead ) {
+      config->tfHead = tfPtr->next;
+    } else {
+      tfPtr->prev->next = tfPtr->next;
+    }
+
+    if ( tfPtr EQ config->tfTail ) {
+      config->tfTail = tfPtr->prev;
+    } else {
+      tfPtr->next->prev = tfPtr->prev;
+    }
+
+    /* remove hash flow records */
+    deleteHashRecord( config->tcpFlowHash, (char *)&tmpTfPtr->aRecOut, sizeof( struct trafficAddressRecord ) );
+    deleteHashRecord( config->tcpFlowHash, (char *)&tmpTfPtr->aRecIn, sizeof( struct trafficAddressRecord ) );
+
+    /* next flow record */
+    f++;
+    tfPtr = tfPtr->next;
+    XFREE( tmpTfPtr );
+    config->flowCount--;
+  }
+
+#ifdef DEBUG
+  if ( config->debug >= 1 )
+    display( LOG_DEBUG, "[%d] tcp flow records and [%d] tcp traffic records deleted", f, r );
+#endif
 }

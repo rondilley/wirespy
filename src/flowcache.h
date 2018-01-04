@@ -1,8 +1,8 @@
 /****
  *
- * Headers for Wirespy Daemon
+ * Headers for flow cache
  * 
- * Copyright (c) 2006-2017, Ron Dilley
+ * Copyright (c) 2006-2018, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,8 +20,8 @@
  *
  ****/
 
-#ifndef WSD_DOT_H
-#define WSD_DOT_H
+#ifndef FLOWCACHE_DOT_H
+#define FLOWCACHE_DOT_H
 
 /****
  *
@@ -29,24 +29,15 @@
  *
  ****/
 
-#define PROGNAME "wsd"
+#define PROGNAME "flowcache"
 #define MODE_DAEMON 0
 #define MODE_INTERACTIVE 1
 #define MODE_DEBUG 2
 
-/* packet count */
-#define LOOP_PACKET_COUNT 16
-#define LOOP_PACKET_TIME 5 /* seconds */
+/* arg len boundary */
+#define MAX_ARG_LEN 1024
 
-#define LOGDIR "/var/log/wsd"
-#define PID_FILE "/var/run/wsd.pid"
-
-/* header length defs */
-#define PPP_HDRLEN 4
-#define NULL_HDRLEN 4
-
-/* alarm interval */
-#define CTIME_SYNC_INTERVAL 5
+#define MAX_IP_ADDR_LEN 46
 
 /****
  *
@@ -101,16 +92,5 @@ void sigill_handler( int signo );
 void ctime_prog( int signo );
 PRIVATE void print_version( void );
 PRIVATE void print_help( void );
-PRIVATE int start_collecting( void );
-PRIVATE int process_pcap( char *fName );
-PRIVATE int show_interfaces( void );
-pcap_handler get_handler( int datalink_type, char *device );
-void dl_ppp(u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
-void dl_raw(u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
-void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
-void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *packet );
-void processIpPacket( const struct pcap_pkthdr *header, u_int transportSize, struct trafficRecord *tr, const u_char *packet );
-PRIVATE int avg_loop_count( int cur_loop_count );
-bpf_u_int32 get_iface_info( char *device );
 
-#endif /* WSD_DOT_H */
+#endif /* FLOWCACHE_DOT_H */

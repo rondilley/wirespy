@@ -2,7 +2,7 @@
  *
  * Headers for Process TCP Packets
  * 
- * Copyright (c) 2006-2017, Ron Dilley
+ * Copyright (c) 2006-2018, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -77,5 +77,8 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
 int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr );
 void pruneFlows( void );
 int reportTcpFlow( struct tcpFlow *tfPtr );
+int writeFlowState( char *out_fName );
+int readFlowState( char *in_fName );
+void cleanupTcpFlows( void );
 
 #endif /* PROCESS_TCP_DOT_H */
