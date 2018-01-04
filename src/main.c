@@ -510,8 +510,8 @@ int main(int argc, char *argv[]) {
 
   if ( config->wFlow_fName != NULL )
     writeFlowState( config->wFlow_fName );
-  else
-    cleanup();
+
+  cleanup();
 
   return( EXIT_SUCCESS );
 }
@@ -858,9 +858,6 @@ PRIVATE int process_pcap( char *fName ) {
     }
 
     fclose( config->log_st );
-
-    /* empty out the tcp flow linked lists */
-    cleanupTcpFlows();
   }
   
   /* cleanup */
@@ -1109,9 +1106,6 @@ PRIVATE int start_collecting( void ) {
       /* time to rotate the logs */
       
       fclose( config->log_st );
-
-      /* empty out the tcp flow linked lists */
-      cleanupTcpFlows();
 
       /* initialize current time struct */
       localtime_r(&config->current_time, &current_time);
