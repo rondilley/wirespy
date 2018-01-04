@@ -862,10 +862,6 @@ PRIVATE int process_pcap( char *fName ) {
     /* empty out the tcp flow linked lists */
     cleanupTcpFlows();
   }
-
-  /* write flow cache */
-  if ( config->wFlow_fName != NULL )
-      writeFlowState( config->wFlow_fName );
   
   /* cleanup */
   //pcap_freecode( &fp );
