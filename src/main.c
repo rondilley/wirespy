@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
 
   while (1) {
     int this_option_optind = optind ? optind : 1;
+#ifdef HAVE_GETOPT_LONG
     int option_index = 0;
     static struct option long_options[] = {
       {"logdir", required_argument, 0, 'l' },
@@ -142,144 +143,130 @@ int main(int argc, char *argv[]) {
     };
 
     c = getopt_long(argc, argv, "vVd:hi:l:L:p:u:g:r:R:W:", long_options, &option_index);
+#else
+    c = getopt( argc, argv, "vVd:hi:l:L:p:u:g:r:R:W:" );
+#endif
     if (c EQ -1)
       break;
 
     switch (c) {
-    case 0:
-      printf ("option %s", long_options[option_index].name);
-      if (optarg)
-        printf (" with arg %s", optarg);
 
-      printf ("\n");
-      break;
+        case 'v':
+            /* show the version */
+            print_version();
+            return( EXIT_SUCCESS );
 
-    case 'v':
-      /* show the version */
-      print_version();
-      return( EXIT_SUCCESS );
-
-    case 'V':
-      /* print more detailed traffic logs */
-      config->verbose = TRUE;
-      break;
+        case 'V':
+            /* print more detailed traffic logs */
+            config->verbose = TRUE;
+            break;
       
-    case 'd':
-      /* show debig info */
-      config->debug = atoi( optarg );
-      config->mode = MODE_INTERACTIVE;
-      break;
+        case 'd':
+            /* show debig info */
+            config->debug = atoi( optarg );
+            config->mode = MODE_INTERACTIVE;
+            break;
 
-    case 'h':
-      /* show help info */
-      print_help();
-      return( EXIT_SUCCESS );
+        case 'h':
+            /* show help info */
+            print_help();
+            return( EXIT_SUCCESS );
 
-    case 'p':
-      /* define the location of the pid file used for rotating logs, etc */
-      pid_file = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( pid_file, 0, MAXPATHLEN+1 );
-      strncpy( pid_file, optarg, MAXPATHLEN );
+        case 'p':
+            /* define the location of the pid file used for rotating logs, etc */
+            pid_file = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( pid_file, 0, MAXPATHLEN+1 );
+            strncpy( pid_file, optarg, MAXPATHLEN );
+            break;
 
-      break;
-
-    case 'l':
-      /* define the dir to store logs in */
-      config->log_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( config->log_dir, 0, MAXPATHLEN+1 );
-      strncpy( config->log_dir, optarg, MAXPATHLEN );
-
-      break;
+        case 'l':
+            /* define the dir to store logs in */
+            config->log_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( config->log_dir, 0, MAXPATHLEN+1 );
+            strncpy( config->log_dir, optarg, MAXPATHLEN );
+            break;
       
-    case 'L':
-      /* define the file, overrides -l */
-      config->log_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( config->log_fName, 0, MAXPATHLEN+1 );
-      strncpy( config->log_fName, optarg, MAXPATHLEN );
-
-      break;
+        case 'L':
+            /* define the file, overrides -l */
+            config->log_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( config->log_fName, 0, MAXPATHLEN+1 );
+            strncpy( config->log_fName, optarg, MAXPATHLEN );
+            break;
       
-    case 'r':
-      /* define pcap file to read from */
-      config->pcap_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( config->pcap_fName, 0, MAXPATHLEN+1 );
-      strncpy( config->pcap_fName, optarg, MAXPATHLEN );
-      config->mode = MODE_INTERACTIVE;
+        case 'r':
+            /* define pcap file to read from */
+            config->pcap_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( config->pcap_fName, 0, MAXPATHLEN+1 );
+            strncpy( config->pcap_fName, optarg, MAXPATHLEN );
+            config->mode = MODE_INTERACTIVE;
+            break;
+
+        case 'W':
+            /* define flow cache file to write to */
+            config->wFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( config->wFlow_fName, 0, MAXPATHLEN+1 );
+            strncpy( config->wFlow_fName, optarg, MAXPATHLEN );
+            break;
       
-      break;
-
-    case 'W':
-      /* define flow cache file to write to */
-      config->wFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( config->wFlow_fName, 0, MAXPATHLEN+1 );
-      strncpy( config->wFlow_fName, optarg, MAXPATHLEN );
+        case 'R':
+            /* define flow cache file to read from */
+            config->rFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( config->rFlow_fName, 0, MAXPATHLEN+1 );
+            strncpy( config->rFlow_fName, optarg, MAXPATHLEN );
+            break;
       
-      break;
-      
-    case 'R':
-      /* define flow cache file to read from */
-      config->rFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( config->rFlow_fName, 0, MAXPATHLEN+1 );
-      strncpy( config->rFlow_fName, optarg, MAXPATHLEN );
-      
-      break;
-      
-    case 'c':
-      /* chroot the process into the specific dir */
-      chroot_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
-      XMEMSET( chroot_dir, 0, MAXPATHLEN+1 );
-      strncpy( chroot_dir, optarg, MAXPATHLEN );
+        case 'c':
+            /* chroot the process into the specific dir */
+            chroot_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
+            XMEMSET( chroot_dir, 0, MAXPATHLEN+1 );
+            strncpy( chroot_dir, optarg, MAXPATHLEN );
+            break;
 
-      break;
+        case 'i':
+            /* set the interface to monitor */
+            config->in_iface = ( char * )XMALLOC( (sizeof(char)*MAXPATHLEN)+1 );
+            XMEMSET( config->in_iface, 0, (sizeof(char)*MAXPATHLEN)+1 );
+            strncpy( config->in_iface, optarg, MAXPATHLEN );
+            break;
 
-    case 'i':
-      /* set the interface to monitor */
-      config->in_iface = ( char * )XMALLOC( (sizeof(char)*MAXPATHLEN)+1 );
-      XMEMSET( config->in_iface, 0, (sizeof(char)*MAXPATHLEN)+1 );
-      strncpy( config->in_iface, optarg, MAXPATHLEN );
+        case 'u':
 
-      break;
+            /* set user to run as */
+            user = ( char * )XMALLOC( (sizeof(char)*MAX_USER_LEN)+1 );
+            XMEMSET( user, 0, (sizeof(char)*MAX_USER_LEN)+1 );
+            strncpy( user, optarg, MAX_USER_LEN );
+            if ( ( pwd_ent = getpwnam( user ) ) EQ NULL ) {
+                fprintf( stderr, "ERR - Unknown user [%s]\n", user );
+                endpwent();
+                XFREE( user );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
+            config->uid = pwd_ent->pw_uid;
+            endpwent();
+            XFREE( user );
+            break;
 
-    case 'u':
+        case 'g':
 
-      /* set user to run as */
-      user = ( char * )XMALLOC( (sizeof(char)*MAX_USER_LEN)+1 );
-      XMEMSET( user, 0, (sizeof(char)*MAX_USER_LEN)+1 );
-      strncpy( user, optarg, MAX_USER_LEN );
-      if ( ( pwd_ent = getpwnam( user ) ) EQ NULL ) {
-	fprintf( stderr, "ERR - Unknown user [%s]\n", user );
-	endpwent();
-	XFREE( user );
-	cleanup();
-	exit( EXIT_FAILURE );
-      }
-      config->uid = pwd_ent->pw_uid;
-      endpwent();
-      XFREE( user );
+            /* set gid to run as */
+            group = ( char * )XMALLOC( (sizeof(char)*MAX_GROUP_LEN)+1 );
+            XMEMSET( group, 0, (sizeof(char)*MAX_GROUP_LEN)+1 );
+            strncpy( group, optarg, MAX_GROUP_LEN );
+            if ( ( grp_ent = getgrnam( group ) ) EQ NULL ) {
+                fprintf( stderr, "ERR - Unknown group [%s]\n", group );
+                endgrent();
+                XFREE( group );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
+            config->gid = grp_ent->gr_gid;
+            endgrent();
+            XFREE( group );
+            break;
 
-      break;
-
-    case 'g':
-
-      /* set gid to run as */
-      group = ( char * )XMALLOC( (sizeof(char)*MAX_GROUP_LEN)+1 );
-      XMEMSET( group, 0, (sizeof(char)*MAX_GROUP_LEN)+1 );
-      strncpy( group, optarg, MAX_GROUP_LEN );
-      if ( ( grp_ent = getgrnam( group ) ) EQ NULL ) {
-	fprintf( stderr, "ERR - Unknown group [%s]\n", group );
-	endgrent();
-	XFREE( group );
-	cleanup();
-	exit( EXIT_FAILURE );
-      }
-      config->gid = grp_ent->gr_gid;
-      endgrent();
-      XFREE( group );
-    
-      break;
-
-    default:
-      fprintf( stderr, "Unknown option code [0%o]\n", c);
+        default:
+            fprintf( stderr, "Unknown option code [0%o]\n", c);
     }
   }
 
@@ -697,23 +684,42 @@ PRIVATE void print_version( void ) {
 PRIVATE void print_help( void ) {
   print_version();
 
-  printf( "\n" );
-  printf( "syntax: %s [options]\n", PACKAGE );
-  printf( " -c|--chroot {dir}    chroot into directory\n" );
-  printf( " -d|--debug (0-9)     enable debugging info\n" );
-  printf( " -g|--group {group}   run as an alternate group\n" );
-  printf( " -h|--help            this info\n" );
-  printf( " -i|--iniface {int}   specify interface to listen on\n" );
-  printf( " -l|--logdir {dir}    directory to create logs in (default: %s)\n", LOGDIR );
-  printf( " -L|--logfile {fname} specify log file instead of dynamic generated filenames\n" );
-  printf( " -p|--pidfile {fname} specify pid file (default: %s)\n", PID_FILE );
-  printf( " -r|--read {fname}    specify pcap file to read\n" );
-  printf( " -R|--rflow {fname}   specify flow cache file to read\n" );
-  printf( " -u|--user {user}     run as an alernate user\n" );
-  printf( " -v|--version         display version information\n" );
-  printf( " -V|--verbose         log additional details about traffic\n" );
-  printf( " -W|--wflow {fname}   specify flow cache file to write\n" );
-  printf( "\n" );
+  fprintf( stderr, "\n" );
+  fprintf( stderr, "syntax: %s [options]\n", PACKAGE );
+  
+#ifdef HAVE_GETOPT_LONG
+  fprintf( stderr, " -c|--chroot {dir}    chroot into directory\n" );
+  fprintf( stderr, " -d|--debug (0-9)     enable debugging info\n" );
+  fprintf( stderr, " -g|--group {group}   run as an alternate group\n" );
+  fprintf( stderr, " -h|--help            this info\n" );
+  fprintf( stderr, " -i|--iniface {int}   specify interface to listen on\n" );
+  fprintf( stderr, " -l|--logdir {dir}    directory to create logs in (default: %s)\n", LOGDIR );
+  fprintf( stderr, " -L|--logfile {fname} specify log file instead of dynamic generated filenames\n" );
+  fprintf( stderr, " -p|--pidfile {fname} specify pid file (default: %s)\n", PID_FILE );
+  fprintf( stderr, " -r|--read {fname}    specify pcap file to read\n" );
+  fprintf( stderr, " -R|--rflow {fname}   specify flow cache file to read\n" );
+  fprintf( stderr, " -u|--user {user}     run as an alernate user\n" );
+  fprintf( stderr, " -v|--version         display version information\n" );
+  fprintf( stderr, " -V|--verbose         log additional details about traffic\n" );
+  fprintf( stderr, " -W|--wflow {fname}   specify flow cache file to write\n" );
+#else
+  fprintf( stderr, " -c {dir}   chroot into directory\n" );
+  fprintf( stderr, " -d (0-9)   enable debugging info\n" );
+  fprintf( stderr, " -g {group} run as an alternate group\n" );
+  fprintf( stderr, " -h         this info\n" );
+  fprintf( stderr, " -i {int}   specify interface to listen on\n" );
+  fprintf( stderr, " -l {dir}   directory to create logs in (default: %s)\n", LOGDIR );
+  fprintf( stderr, " -L {fname} specify log file instead of dynamic generated filenames\n" );
+  fprintf( stderr, " -p {fname} specify pid file (default: %s)\n", PID_FILE );
+  fprintf( stderr, " -r {fname} specify pcap file to read\n" );
+  fprintf( stderr, " -R {fname} specify flow cache file to read\n" );
+  fprintf( stderr, " -u {user}  run as an alernate user\n" );
+  fprintf( stderr, " -v         display version information\n" );
+  fprintf( stderr, " -V         log additional details about traffic\n" );
+  fprintf( stderr, " -W {fname} specify flow cache file to write\n" );  
+#endif
+  
+  fprintf( stderr, "\n" );
 }
 
 /****

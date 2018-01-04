@@ -237,6 +237,7 @@ AC_CHECK_HEADERS([sys/bitypes.h])
 AC_CHECK_HEADERS([sys/dir.h])
 AC_CHECK_HEADERS([sys/ndir.h])
 AC_CHECK_HEADERS([sys/stat.h])
+AC_CHECK_HEADERS([getopt.h])
 AC_CHECK_HEADERS([syslog.h])
 AC_CHECK_HEADERS([dirent.h])
 AC_CHECK_HEADERS([inttypes.h])
@@ -260,6 +261,7 @@ AC_CHECK_HEADERS([vfork.h])
 
 dnl ############## Function checks
 
+AC_CHECK_FUNCS([getopt_long])
 AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([bzero])
 AC_CHECK_FUNCS([endgrent])
