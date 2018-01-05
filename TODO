@@ -4,6 +4,9 @@ wsd TODO list
 Short-term:
 -----------
 * Ability to summarize TCP sessions
+* Add HTTP processor
+* Add TELNET processor
+* Add SMTP processor
 
 Long-term:
 ----------
