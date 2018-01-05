@@ -674,6 +674,8 @@ int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr ) {
     tfPtr->tail = tmpTrPtr;
   }
 
+  tfPtr->recordCount++;
+  
   return TRUE;
 }
 
@@ -1136,7 +1138,8 @@ int readFlowState( char *in_fName ) {
         tfPtr = (struct tcpFlow *)XMALLOC( sizeof( struct tcpFlow ) );
         XMEMSET( tfPtr, 0, sizeof( struct tcpFlow ) );
         XMEMCPY( tfPtr, &tmpFlowBuf, sizeof( struct tcpFlowCache ) );
-
+        tfPtr->recordCount = 0;
+        
         /* insert new traffic flow into hash */
         if ( addUniqueHashRec( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ), tfPtr ) != TRUE ) {
 #ifdef DEBUG
@@ -1186,7 +1189,7 @@ int readFlowState( char *in_fName ) {
         config->flowCount++;
         f++;
         
-        for( i = 0; i < ( tmpFlowBuf.packetsIn + tmpFlowBuf.packetsOut ); i++, r++ ) {
+        for( i = 0; i < ( tmpFlowBuf.recordCount ); i++, r++ ) {
             if ( ( ret = fread( &tmpRecBuf, sizeof( struct trafficRecordCache ), 1, inFile ) ) EQ 0 ) {
                 display( LOG_ERR, "Problem while reading record cache" );
                 return FAILED;
@@ -1195,11 +1198,10 @@ int readFlowState( char *in_fName ) {
             /* insert traffic record into linked list */
             insertTrafficRecord( tfPtr, &tmpRecBuf );
         }
-
-#ifdef DEBUG
+#ifndef FLOWCACHE    
         if ( config->debug >= 4 )
-            showTcpFlow( tfPtr );
 #endif
+            showTcpFlow( tfPtr );
     }
     
 #ifdef DEBUG

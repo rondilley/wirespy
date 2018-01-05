@@ -30,6 +30,7 @@
  ****/
 
 #define PROGNAME "wsd"
+#define WSD 1
 #define MODE_DAEMON 0
 #define MODE_INTERACTIVE 1
 #define MODE_DEBUG 2
