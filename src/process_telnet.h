@@ -1,6 +1,6 @@
 /****
  *
- * Headers for Process TCP Packets
+ * Headers for Process TELNET Packets
  * 
  * Copyright (c) 2006-2018, Ron Dilley
  * All rights reserved.
@@ -20,19 +20,14 @@
  *
  ****/
 
-#ifndef PROCESS_TCP_DOT_H
-#define PROCESS_TCP_DOT_H
+#ifndef PROCESS_TELNET_DOT_H
+#define PROCESS_TELNET_DOT_H
 
 /****
  *
  * defines
  *
  ****/
-
-#define FLOW_OUTBOUND 2
-#define FLOW_INBOUND 1
-#define FLOW_FALSE 0
-#define FLOW_UNKNOWN (-1)
 
 /****
  *
@@ -53,9 +48,7 @@
 #include <common.h>
 #include "util.h"
 #include "mem.h"
-#include "process_http.h"
-#include "process_telnet.h"
-#include "process_smtp.h"
+#include "wirespy.h"
 
 /****
  *
@@ -75,13 +68,6 @@
  *
  ****/
 
-void processTcpPacket( struct trafficRecord *tr, const u_char *packet );
-void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir );
-int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr );
-void pruneFlows( void );
-int reportTcpFlow( struct tcpFlow *tfPtr );
-int writeFlowState( char *out_fName );
-int readFlowState( char *in_fName );
-void cleanupTcpFlows( void );
+void processTelnetFlow( struct tcpFlow *tf, struct trafficRecord *tr, const u_char *packet );
 
-#endif /* PROCESS_TCP_DOT_H */
+#endif /* PROCESS_TELNET_DOT_H */

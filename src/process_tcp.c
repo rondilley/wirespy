@@ -48,6 +48,12 @@ extern Config_t *config;
 
 /****
  *
+ * external functions
+ *
+ ****/
+
+/****
+ *
  * functions
  *
  ****/
@@ -82,62 +88,11 @@ void pruneFlows( void ) {
         tmpTfPtr = tfPtr;
         tfPtr = tfPtr->next;
         reportTcpFlow( tmpTfPtr );
-        
       } else if ( ( tfPtr->lastUpdate + 600 ) < config->last_packet_time ) { // flow not closed but no traffic for too long
         /* old traffic flow, remove it */
-
-#ifdef DEBUG
-	if ( config->debug >= 4 )
-	  display( LOG_DEBUG, "Removing records in old flow" );
-#endif
-
-	/* empty the traffic records related to this flow */
-        
-        while( tfPtr->head != NULL ) {
-#ifdef DEBUG
-          r++;
-#endif
-          if ( tfPtr->head EQ tfPtr->tail ) {
-            XFREE( tfPtr->head );
-            tfPtr->head = NULL;
-          } else {
-            tfPtr->tail = tfPtr->tail->prev;
-            XFREE( tfPtr->tail->next );
-          }
-        }
-        tfPtr->head = tfPtr->tail = NULL;
-
-#ifdef DEBUG
-        if ( config->debug >= 2 )
-          display( LOG_DEBUG, "[%d] tcp traffic records deleted", r );
-#endif        
-        
-#ifdef DEBUG
-	if ( config->debug >= 4 ) 
-	  display( LOG_DEBUG, "Removing old flow" );
-#endif
-
-	tmpTfPtr = tfPtr;
-
-	if ( tfPtr EQ config->tfHead ) {
-	  config->tfHead = tfPtr->next;
-	} else {
-	  tfPtr->prev->next = tfPtr->next;
-	}
-
-	if ( tfPtr EQ config->tfTail ) {
-	  config->tfTail = tfPtr->prev;
-	} else {
-	  tfPtr->next->prev = tfPtr->prev;
-	}
-
-        /* remove hash flow records */
-        deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecOut, sizeof( struct trafficAddressRecord ) );
-        deleteHashRecord( config->tcpFlowHash, (char *)&tfPtr->aRecIn, sizeof( struct trafficAddressRecord ) );
-
-	tfPtr = tfPtr->next;
-	XFREE( tmpTfPtr );
-        config->flowCount--;
+        tmpTfPtr = tfPtr;
+        tfPtr = tfPtr->next;
+        reportTcpFlow( tmpTfPtr );
       } else
         tfPtr = tfPtr->next;
     }
@@ -334,7 +289,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
     
         
     /* insert traffic record into linked list */
-    insertTrafficRecord( tfPtr, tr );
+    //insertTrafficRecord( tfPtr, tr );
  
     if ( config->tfHead EQ NULL ) {
       config->tfHead = config->tfTail = tfPtr;
@@ -393,7 +348,10 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
         if ( tfPtr->status != TCP_FLOW_EST ) {
 	  /* FIN packet received outside of flow */
 	  display( LOG_DEBUG, "FIN outside of flow" );
-	} else {
+	  /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+        } else {
 
 	  tfPtr->status = TCP_FLOW_FIN1;
 
@@ -405,10 +363,10 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
     
           /* increment outbound byte count */
           tfPtr->bytesOut += tr->size;
-    
-	  /* insert traffic record */
-	  insertTrafficRecord( tfPtr, tr );
-
+          
+          /* insert traffic record */
+          //insertTrafficRecord( tfPtr, tr );
+          
 	  /* log packet */
           if ( config->verbose )
             logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
@@ -424,6 +382,9 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 	if ( tfPtr->status != TCP_FLOW_EST ) {
 	  /* FIN packet received outside of flow */
 	  display( LOG_DEBUG, "Short FIN+ACK outside of flow" );
+          /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 	} else {
 
 	  tfPtr->status = TCP_FLOW_FIN2;
@@ -435,7 +396,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
           /* increment outbound byte count */
           tfPtr->bytesOut += tr->size;
     
-	  insertTrafficRecord( tfPtr, tr );
+	  //insertTrafficRecord( tfPtr, tr );
 
 	  /* log packet */
           if ( config->verbose )
@@ -455,6 +416,9 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 	     ) {
 	  /* ack packet received outside of a flow */
 	  display( LOG_DEBUG, "ACK outside of flow" );
+	  /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 	} else {
 
 	  if ( ( tfPtr->status EQ TCP_FLOW_FIN1 ) || ( tfPtr->status EQ TCP_FLOW_FIN2 ) )
@@ -470,13 +434,26 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
           /* increment outbound byte count */
           tfPtr->bytesOut += tr->size;
          
-	  insertTrafficRecord( tfPtr, tr );
-
 	  /* log packet */
           if ( config->verbose )
             logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 
-          if ( tfPtr->status EQ TCP_FLOW_CLOSED ) {
+          if ( tfPtr->status EQ TCP_FLOW_EST ) {
+            /* process specific established flows */
+            if ( tfPtr->aRecOut.dPort EQ 23 ) { // telnet
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processTelnetFlow( tfPtr, tr, packet );
+            } else if ( tfPtr->aRecOut.dPort EQ 25 ) { // smtp
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processSmtpFlow( tfPtr, tr, packet );
+            } else if ( tfPtr->aRecOut.dPort EQ 80 ) { // http
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processHttpFlow( tfPtr, tr, packet );
+            }            
+          } else if ( tfPtr->status EQ TCP_FLOW_CLOSED ) {
             /* report and delete flow */
             reportTcpFlow( tfPtr );
           }
@@ -496,7 +473,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
         /* increment outbound byte count */
         tfPtr->bytesOut += tr->size;
     
-	insertTrafficRecord( tfPtr, tr );
+	//insertTrafficRecord( tfPtr, tr );
 
 	/* log packet */
         if ( config->verbose )
@@ -525,6 +502,9 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
         if ( tfPtr->status != TCP_FLOW_SYN ) {
           /* out of order syn+ack */
 	  display( LOG_DEBUG, "SYN+ACK outside of flow" );
+	  /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
         } else {
 	  /*
 	   * search for ack in flow
@@ -541,7 +521,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
           /* increment outbound byte count */
           tfPtr->bytesIn += tr->size;
     
-	  insertTrafficRecord( tfPtr, tr );
+	  //insertTrafficRecord( tfPtr, tr );
 
 	  /* log packet */
           if ( config->verbose )
@@ -557,6 +537,9 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
   	if ( tfPtr->status != TCP_FLOW_FIN1 ) {
 	  /* FIN packet received outside of flow */
 	  display( LOG_DEBUG, "FIN+ACK outside of flow" );
+	  /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 	} else {
 
 	  tfPtr->status = TCP_FLOW_FIN2;
@@ -568,7 +551,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
           /* increment outbound byte count */
           tfPtr->bytesIn += tr->size;
     
-	  insertTrafficRecord( tfPtr, tr );
+	  //insertTrafficRecord( tfPtr, tr );
 
 	  /* log packet */
           if ( config->verbose )
@@ -581,12 +564,19 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #else
       } else if ( tcp_ptr->ack ) {
 #endif
-	if ( ( tfPtr->status != TCP_FLOW_EST )
+	if ( ( tfPtr->status != TCP_FLOW_EST ) &
+	     ( tfPtr->status != TCP_FLOW_FIN1 ) &
+	     ( tfPtr->status != TCP_FLOW_FIN2 )
 	     ) {
 	  /* ack packet received outside of a flow */
 	  display( LOG_DEBUG, "ACK outside of flow" );
+	  /* log packet */
+          if ( config->verbose )
+            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 	} else {
-
+	  if ( ( tfPtr->status EQ TCP_FLOW_FIN1 ) || ( tfPtr->status EQ TCP_FLOW_FIN2 ) )
+	    tfPtr->status = TCP_FLOW_CLOSED;
+          
           tfPtr->lastUpdate = tr->wire_sec;
 
           /* increment outbound packet count */
@@ -595,12 +585,32 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
           /* increment outbound byte count */
           tfPtr->bytesIn += tr->size;
     
-	  insertTrafficRecord( tfPtr, tr );
+	  //insertTrafficRecord( tfPtr, tr );
 
 	  /* log packet */
           if ( config->verbose )
             logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
 
+          if ( tfPtr->status EQ TCP_FLOW_EST ) {
+            /* process specific established flows */
+            if ( tfPtr->aRecOut.sPort EQ 23 ) { // telnet
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processTelnetFlow( tfPtr, tr, packet );
+            } else if ( tfPtr->aRecOut.sPort EQ 25 ) { // smtp
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processSmtpFlow( tfPtr, tr, packet );
+            } else if ( tfPtr->aRecOut.sPort EQ 80 ) { // http
+              /* insert traffic record */
+              insertTrafficRecord( tfPtr, tr );
+              processHttpFlow( tfPtr, tr, packet );
+            }            
+          } else if ( tfPtr->status EQ TCP_FLOW_CLOSED ) {
+            /* report and delete flow */
+            reportTcpFlow( tfPtr );
+          }
+          
 	  return;
 	}
 #ifdef BSD_DERIVED
@@ -616,7 +626,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
         /* increment outbound byte count */
         tfPtr->bytesIn += tr->size;
     
-	insertTrafficRecord( tfPtr, tr );
+	//insertTrafficRecord( tfPtr, tr );
 
 	/* log packet */
         if ( config->verbose )
@@ -816,6 +826,20 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
   return;
 }
 
+/****
+ *
+ * traverse traffic records
+ * 
+ ****/
+
+int traverseTrafficRecords ( struct tcpFlow *tfPtr ) {
+    // clientIsn
+    // serverIsn
+    // currentTrSeq
+    // currentTrAck
+    // currnetTrSize
+}
+  
 /****
  * 
  * show flow record
