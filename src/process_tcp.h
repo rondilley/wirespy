@@ -77,6 +77,7 @@
 
 void processTcpPacket( struct trafficRecord *tr, const u_char *packet );
 void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir );
+void logTcpPacketErr( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir, char *errStr );
 int insertTrafficRecord( struct tcpFlow *tfPtr, struct trafficRecord *trPtr );
 void pruneFlows( void );
 int reportTcpFlow( struct tcpFlow *tfPtr );

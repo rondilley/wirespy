@@ -342,7 +342,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #ifdef BSD_DERIVED
       if ( ( tcp_ptr->th_flags & TH_FIN ) && ! ( tcp_ptr->th_flags & TH_ACK ) ) {
 #else
-      if ( tcp_ptr->fin & ! tcp_ptr->ack ) {
+      if ( tcp_ptr->fin && ! tcp_ptr->ack ) {
 #endif
 
         if ( tfPtr->status != TCP_FLOW_EST ) {
@@ -350,7 +350,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 	  display( LOG_DEBUG, "FIN outside of flow" );
 	  /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "FIN outside of flow" );
         } else {
 
 	  tfPtr->status = TCP_FLOW_FIN1;
@@ -377,14 +377,16 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #ifdef BSD_DERIVED
       } else if ( ( tcp_ptr->th_flags & TH_FIN ) && ( tcp_ptr->th_flags & TH_ACK ) ) {
 #else
-      } else if ( tcp_ptr->fin & tcp_ptr->ack ) {
+      } else if ( tcp_ptr->fin && tcp_ptr->ack ) {
 #endif
-	if ( tfPtr->status != TCP_FLOW_EST ) {
+	if ( ( tfPtr->status != TCP_FLOW_EST ) &&
+             ( tfPtr->status != TCP_FLOW_FIN1 ) &&
+             ( tfPtr->status != TCP_FLOW_FIN2 ) ) {
 	  /* FIN packet received outside of flow */
 	  display( LOG_DEBUG, "Short FIN+ACK outside of flow" );
           /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "Short FIN+ACK outside of flow" );
 	} else {
 
 	  tfPtr->status = TCP_FLOW_FIN2;
@@ -409,16 +411,16 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #else
       } else if ( tcp_ptr->ack ) {
 #endif
-	if ( ( tfPtr->status != TCP_FLOW_SYNACK ) &
-	     ( tfPtr->status != TCP_FLOW_EST ) &
-	     ( tfPtr->status != TCP_FLOW_FIN1 ) &
+	if ( ( tfPtr->status != TCP_FLOW_SYNACK ) &&
+	     ( tfPtr->status != TCP_FLOW_EST ) &&
+	     ( tfPtr->status != TCP_FLOW_FIN1 ) &&
 	     ( tfPtr->status != TCP_FLOW_FIN2 )
 	     ) {
 	  /* ack packet received outside of a flow */
 	  display( LOG_DEBUG, "ACK outside of flow" );
 	  /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "ACK outside of flow" );
 	} else {
 
 	  if ( ( tfPtr->status EQ TCP_FLOW_FIN1 ) || ( tfPtr->status EQ TCP_FLOW_FIN2 ) )
@@ -497,14 +499,14 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #ifdef BSD_DERIVED
       if ( ( tcp_ptr->th_flags & TH_SYN ) && ( tcp_ptr->th_flags & TH_ACK ) ) {
 #else
-      if ( tcp_ptr->syn & tcp_ptr->ack ) {
+      if ( tcp_ptr->syn && tcp_ptr->ack ) {
 #endif
         if ( tfPtr->status != TCP_FLOW_SYN ) {
           /* out of order syn+ack */
 	  display( LOG_DEBUG, "SYN+ACK outside of flow" );
 	  /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "SYN+ACK outside of flow" );
         } else {
 	  /*
 	   * search for ack in flow
@@ -532,14 +534,16 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #ifdef BSD_DERIVED
       } else if ( ( tcp_ptr->th_flags & TH_FIN ) && ( tcp_ptr->th_flags & TH_ACK ) ) {
 #else
-      } else if ( tcp_ptr->fin & tcp_ptr->ack ) {
+      } else if ( tcp_ptr->fin && tcp_ptr->ack ) {
 #endif
-  	if ( tfPtr->status != TCP_FLOW_FIN1 ) {
+  	if ( ( tfPtr->status != TCP_FLOW_FIN1 ) &&
+             ( tfPtr->status != TCP_FLOW_FIN2 ) &&
+             ( tfPtr->status != TCP_FLOW_EST ) ) {
 	  /* FIN packet received outside of flow */
 	  display( LOG_DEBUG, "FIN+ACK outside of flow" );
 	  /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "FIN+ACK outside of flow" );
 	} else {
 
 	  tfPtr->status = TCP_FLOW_FIN2;
@@ -564,15 +568,15 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 #else
       } else if ( tcp_ptr->ack ) {
 #endif
-	if ( ( tfPtr->status != TCP_FLOW_EST ) &
-	     ( tfPtr->status != TCP_FLOW_FIN1 ) &
+	if ( ( tfPtr->status != TCP_FLOW_EST ) &&
+	     ( tfPtr->status != TCP_FLOW_FIN1 ) &&
 	     ( tfPtr->status != TCP_FLOW_FIN2 )
 	     ) {
 	  /* ack packet received outside of a flow */
 	  display( LOG_DEBUG, "ACK outside of flow" );
 	  /* log packet */
           if ( config->verbose )
-            logTcpPacket( tfPtr, tcp_ptr, tr, flowDirection );
+            logTcpPacketErr( tfPtr, tcp_ptr, tr, flowDirection, "ACK outside of flow" );
 	} else {
 	  if ( ( tfPtr->status EQ TCP_FLOW_FIN1 ) || ( tfPtr->status EQ TCP_FLOW_FIN2 ) )
 	    tfPtr->status = TCP_FLOW_CLOSED;
@@ -830,6 +834,156 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
 
 /****
  *
+ * log packet with error
+ *
+ ****/
+
+void logTcpPacketErr( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct trafficRecord *tr, int flowDir, char *errStr ) {
+  PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+  PRIVATE char d_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
+  PRIVATE char s_ip_addr_str[MAX_IP_ADDR_LEN+2];
+  PRIVATE char d_ip_addr_str[MAX_IP_ADDR_LEN+2];
+  char tcpFlags[9];
+  char flowString[3];
+  int tmpSentCount;
+  int tmpAckCount;
+  
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_FIN )
+#else
+  if ( tcpPtr->fin )
+#endif
+    tcpFlags[0] = 'F';
+  else
+    tcpFlags[0] = '.';
+
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_SYN )
+#else
+  if ( tcpPtr->syn )
+#endif
+    tcpFlags[1] = 'S';
+  else
+    tcpFlags[1] = '.';
+
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_RST )
+#else
+  if ( tcpPtr->rst )
+#endif
+    tcpFlags[2] = 'R';
+  else
+    tcpFlags[2] = '.';
+
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_PUSH )
+#else
+  if ( tcpPtr->psh )
+#endif
+    tcpFlags[3] = 'P';
+  else
+    tcpFlags[3] = '.';
+
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_ACK )
+#else
+  if ( tcpPtr->ack )
+#endif
+    tcpFlags[4] = 'A';
+  else
+    tcpFlags[4] = '.';
+
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_URG )
+#else
+  if ( tcpPtr->urg )
+#endif
+    tcpFlags[5] = 'U';
+  else
+    tcpFlags[5] = '.';
+  
+#ifdef BSD_DERIVED
+  if ( tcpPtr->th_flags & TH_ECE )
+    tcpFlags[6] = 'E';
+  else
+    tcpFlags[6] = '.';
+
+  if ( tcpPtr->th_flags & TH_CWR )
+    tcpFlags[7] = 'C';
+  else
+    tcpFlags[7] = '.';
+  tcpFlags[8] = 0;
+#else
+  tcpFlags[6] = 0;
+#endif
+
+#ifdef DEBUG
+  if ( config->debug >= 6 ) {
+    display( LOG_DEBUG, "TCP: Flags [%s]", tcpFlags );
+  }
+#endif
+
+  /*
+   * write packet to log
+   */
+  XSTRNCPY( s_eth_addr_str, ether_ntoa((struct ether_addr *)tr->aRec.sMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+  XSTRNCPY( d_eth_addr_str, ether_ntoa((struct ether_addr *)tr->aRec.dMac), ((ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN)-1 );
+  XSTRNCPY( s_ip_addr_str, inet_ntoa( tr->aRec.sIp ), MAX_IP_ADDR_LEN );
+  XSTRNCPY( d_ip_addr_str, inet_ntoa( tr->aRec.dIp ), MAX_IP_ADDR_LEN );
+  if ( flowDir EQ FLOW_OUTBOUND ) {
+    XSTRCPY( flowString, "->" );
+    tmpSentCount = tr->seq - tfPtr->clientIsn;
+    tmpAckCount = tr->ack - tfPtr->serverIsn;
+  } else if ( flowDir EQ FLOW_INBOUND ) {
+    XSTRCPY( flowString, "<-" );
+    tmpSentCount = tr->seq - tfPtr->serverIsn;
+    tmpAckCount = tr->ack - tfPtr->clientIsn;
+  } else if ( flowDir EQ FLOW_FALSE ) {
+    XSTRCPY( flowString, "XX" );
+    tmpSentCount = tmpAckCount = 0;
+  } else {
+    XSTRCPY( flowString, "??" );
+    tmpSentCount = tmpAckCount = 0;
+  }
+
+#if SIZEOF_SIZE_T == 8
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+	   tr->wire_sec,
+           tr->wire_usec,
+#else
+#ifdef OPENBSD
+  fprintf( config->log_st, "[%lu.",
+	   tr->wire_sec );
+  fprintf( config->log_st, "%06lu] ",
+	   tr->wire_usec );
+  fprintf( config->log_st, "%17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+#else
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+	   tr->wire_sec,
+           tr->wire_usec,
+#endif
+#endif
+	   s_eth_addr_str,
+           d_eth_addr_str,
+           s_ip_addr_str,
+	   tr->aRec.sPort,
+	   flowString,
+           d_ip_addr_str,
+	   tr->aRec.dPort,
+	   tcpFlags,
+	   tr->win,
+	   tr->seq,
+	   tmpSentCount,
+	   tr->ack,
+	   tmpAckCount,
+           errStr
+	   );
+  
+  return;
+}
+
+/****
+ *
  * traverse traffic records
  * 
  ****/
@@ -868,9 +1022,9 @@ int showTcpFlow( struct tcpFlow *tfPtr ) {
     tmpTm = localtime( &tfPtr->firstUpdate );
 
 #if SIZEOF_SIZE_T == 8
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #else
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u records=%u\n",
 #endif
               tmpTm->tm_year+1900,
               tmpTm->tm_mon+1,
@@ -888,7 +1042,8 @@ int showTcpFlow( struct tcpFlow *tfPtr ) {
               tfPtr->packetsIn,
               tfPtr->packetsOut,
               tfPtr->bytesIn,
-              tfPtr->bytesOut
+              tfPtr->bytesOut,
+              tfPtr->recordCount
             );
 
     display( LOG_INFO, "%s", tmpBuf );
@@ -962,9 +1117,9 @@ int reportTcpFlow( struct tcpFlow *tfPtr ) {
     tmpTm = localtime( &tfPtr->firstUpdate );
 
 #if SIZEOF_SIZE_T == 8
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #else
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u records=%u\n",
 #endif
               tmpTm->tm_year+1900,
               tmpTm->tm_mon+1,
@@ -982,7 +1137,9 @@ int reportTcpFlow( struct tcpFlow *tfPtr ) {
               tfPtr->packetsIn,
               tfPtr->packetsOut,
               tfPtr->bytesIn,
-              tfPtr->bytesOut );
+              tfPtr->bytesOut,
+              tfPtr->recordCount
+            );
 
     fprintf( config->log_st, "%s", tmpBuf ); 
 
@@ -1198,9 +1355,8 @@ int readFlowState( char *in_fName ) {
             /* insert traffic record into linked list */
             insertTrafficRecord( tfPtr, &tmpRecBuf );
         }
-#ifndef FLOWCACHE    
-        if ( config->debug >= 4 )
-#endif
+
+        if ( ( config->pid_file EQ NULL ) || ( config->debug >= 4 ) )
             showTcpFlow( tfPtr );
     }
     
