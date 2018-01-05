@@ -1213,8 +1213,8 @@ int writeFlowState( char *out_fName ) {
     }
     tfPtr->head = tfPtr->tail = NULL;
 
-    if ( ( tfPtr->packetsIn + tfPtr->packetsOut ) != rCount ) {
-        display( LOG_ERR, "Flow reported [%d] records but only saved [%d] records", ( tfPtr->packetsIn + tfPtr->packetsOut ), rCount );
+    if ( tfPtr->recordCount != rCount ) {
+        display( LOG_ERR, "Flow reported [%d] records but only saved [%d] records", tfPtr->recordCount, rCount );
     }
     
 #ifdef DEBUG
@@ -1346,7 +1346,7 @@ int readFlowState( char *in_fName ) {
         config->flowCount++;
         f++;
         
-        for( i = 0; i < ( tmpFlowBuf.recordCount ); i++, r++ ) {
+        for( i = 0; i < tmpFlowBuf.recordCount; i++, r++ ) {
             if ( ( ret = fread( &tmpRecBuf, sizeof( struct trafficRecordCache ), 1, inFile ) ) EQ 0 ) {
                 display( LOG_ERR, "Problem while reading record cache" );
                 return FAILED;
