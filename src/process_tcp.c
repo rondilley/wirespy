@@ -1024,7 +1024,7 @@ int showTcpFlow( struct tcpFlow *tfPtr ) {
 #if SIZEOF_SIZE_T == 8
     snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #else
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u records=%u\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #endif
               tmpTm->tm_year+1900,
               tmpTm->tm_mon+1,
@@ -1119,7 +1119,7 @@ int reportTcpFlow( struct tcpFlow *tfPtr ) {
 #if SIZEOF_SIZE_T == 8
     snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #else
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%u packetsIn=%u packetsOut=%u bytesIn=%u bytesOut=%u records=%u\n",
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
 #endif
               tmpTm->tm_year+1900,
               tmpTm->tm_mon+1,
