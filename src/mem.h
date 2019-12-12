@@ -86,7 +86,7 @@ char *copy_argv(char *argv[]);
 void *xmalloc_( int size, const char *filename, const int linenumber );
 void *xrealloc_( void *ptr, int size, const char *filename, const int linenumber);
 void *xmemset_( void *ptr, const char value, const int size, const char *filename, const int linenumber );
-void *xmemcpy_( void *d_ptr, void *s_ptr, const int size, const char *filename, const int linenumber );
+void *xmemcpy_( void *d_ptr, const void *s_ptr, const size_t size, const char *filename, const int linenumber );
 int xmemcmp_(const void *s1, const void *s2, size_t n, const char *filename, const int linenumber );
 void xfree_( void *ptr, const char *filename, const int linenumber );
 void xfree_all_( const char *filename, const int linenumber );

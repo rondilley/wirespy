@@ -2,7 +2,7 @@
  *
  * Process TCP Packets
  * 
- * Copyright (c) 2006-2017, Ron Dilley
+ * Copyright (c) 2006-2018, Ron Dilley
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -193,7 +193,11 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
      */
 
     /* create new tcp flow record */
-    tfPtr = (struct tcpFlow *)XMALLOC( sizeof( struct tcpFlow ) );
+    if ( ( tfPtr = (struct tcpFlow *)XMALLOC( sizeof( struct tcpFlow ) ) ) EQ NULL ) {
+        display( LOG_ERR, "Unable to allocate memory for flow record" );
+        quit = TRUE;
+        exit( 1 );
+    }
     XMEMSET( tfPtr, 0, sizeof( struct tcpFlow ) );
 
     /* set state to SYN */
@@ -453,7 +457,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
             } else if ( tfPtr->aRecOut.dPort EQ 80 ) { // http
               /* insert traffic record */
               insertTrafficRecord( tfPtr, tr );
-              processHttpFlow( tfPtr, tr, packet );
+              processHttpFlow( tfPtr, tr, packet, flowDirection );
             }            
           } else if ( tfPtr->status EQ TCP_FLOW_CLOSED ) {
             /* report and delete flow */
@@ -496,6 +500,7 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
        ****/
 
       flowDirection = FLOW_INBOUND;
+      
 #ifdef BSD_DERIVED
       if ( ( tcp_ptr->th_flags & TH_SYN ) && ( tcp_ptr->th_flags & TH_ACK ) ) {
 #else
@@ -597,18 +602,18 @@ void processTcpPacket( struct trafficRecord *tr, const u_char *packet ) {
 
           if ( tfPtr->status EQ TCP_FLOW_EST ) {
             /* process specific established flows */
-            if ( tfPtr->aRecOut.sPort EQ 23 ) { // telnet
+            if ( tfPtr->aRecOut.dPort EQ 23 ) { // telnet
               /* insert traffic record */
               insertTrafficRecord( tfPtr, tr );
               processTelnetFlow( tfPtr, tr, packet );
-            } else if ( tfPtr->aRecOut.sPort EQ 25 ) { // smtp
+            } else if ( tfPtr->aRecOut.dPort EQ 25 ) { // smtp
               /* insert traffic record */
               insertTrafficRecord( tfPtr, tr );
               processSmtpFlow( tfPtr, tr, packet );
-            } else if ( tfPtr->aRecOut.sPort EQ 80 ) { // http
+            } else if ( tfPtr->aRecOut.dPort EQ 80 ) { // http
               /* insert traffic record */
               insertTrafficRecord( tfPtr, tr );
-              processHttpFlow( tfPtr, tr, packet );
+              processHttpFlow( tfPtr, tr, packet, flowDirection );
             }            
           } else if ( tfPtr->status EQ TCP_FLOW_CLOSED ) {
             /* report and delete flow */
@@ -1020,12 +1025,30 @@ int showTcpFlow( struct tcpFlow *tfPtr ) {
     XSTRNCPY( d_ip_addr_str, inet_ntoa( tfPtr->aRecOut.dIp ), MAX_IP_ADDR_LEN );
 
     tmpTm = localtime( &tfPtr->firstUpdate );
-
-#if SIZEOF_SIZE_T == 8
-    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
+#if SIZEOF_SIZE_T == 4
+#ifdef OPENBSD
+    printf( "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu ",
+              tmpTm->tm_year+1900,
+              tmpTm->tm_mon+1,
+              tmpTm->tm_mday,
+              tmpTm->tm_hour,
+              tmpTm->tm_min,
+              tmpTm->tm_sec,
+              s_eth_addr_str,
+              s_ip_addr_str,
+              tfPtr->aRecOut.sPort,
+              d_eth_addr_str,
+              d_ip_addr_str,
+              tfPtr->aRecOut.dPort,
+              tfPtr->lastUpdate - tfPtr->firstUpdate );
+    printf( "packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
+              tfPtr->packetsIn,
+              tfPtr->packetsOut,
+              tfPtr->bytesIn,
+              tfPtr->bytesOut,
+              tfPtr->recordCount );  
 #else
     snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
-#endif
               tmpTm->tm_year+1900,
               tmpTm->tm_mon+1,
               tmpTm->tm_mday,
@@ -1045,8 +1068,31 @@ int showTcpFlow( struct tcpFlow *tfPtr ) {
               tfPtr->bytesOut,
               tfPtr->recordCount
             );
-
     display( LOG_INFO, "%s", tmpBuf );
+#endif
+#else
+    snprintf( tmpBuf, sizeof( tmpBuf ), "TCPFLOW startTime=%04d/%02d/%02d %02d:%02d:%02d sourceMac=%s sourceIp=%s sourcePort=%u destMac=%s destIp=%s destPort=%u duration=%lu packetsIn=%lu packetsOut=%lu bytesIn=%lu bytesOut=%lu records=%lu\n",
+              tmpTm->tm_year+1900,
+              tmpTm->tm_mon+1,
+              tmpTm->tm_mday,
+              tmpTm->tm_hour,
+              tmpTm->tm_min,
+              tmpTm->tm_sec,
+              s_eth_addr_str,
+              s_ip_addr_str,
+              tfPtr->aRecOut.sPort,
+              d_eth_addr_str,
+              d_ip_addr_str,
+              tfPtr->aRecOut.dPort,
+              tfPtr->lastUpdate - tfPtr->firstUpdate,
+              tfPtr->packetsIn,
+              tfPtr->packetsOut,
+              tfPtr->bytesIn,
+              tfPtr->bytesOut,
+              tfPtr->recordCount
+            );
+    display( LOG_INFO, "%s", tmpBuf );
+#endif
     
     return TRUE;  
 }
@@ -1148,6 +1194,9 @@ int reportTcpFlow( struct tcpFlow *tfPtr ) {
         display( LOG_DEBUG, "%s", tmpBuf );
 #endif
 
+    if ( tmpTfPtr->aRecOut.dPort EQ 80 )
+        cleanupHttpSession( tmpTfPtr->data );
+    
     XFREE( tmpTfPtr );
     config->flowCount--;
     
@@ -1356,8 +1405,12 @@ int readFlowState( char *in_fName ) {
             insertTrafficRecord( tfPtr, &tmpRecBuf );
         }
 
-        if ( ( config->pid_file EQ NULL ) || ( config->debug >= 4 ) )
+        if ( config->program EQ PROG_FLOW )
             showTcpFlow( tfPtr );
+#ifdef DEBUG
+        else if ( config->debug >= 4 )
+            showTcpFlow( tfPtr );
+#endif
     }
     
 #ifdef DEBUG
@@ -1428,6 +1481,8 @@ void cleanupTcpFlows( void ) {
     /* next flow record */
     f++;
     tfPtr = tfPtr->next;
+    if ( tfPtr->aRecOut.dPort EQ 80 )
+        cleanupHttpSession( tfPtr->data );
     XFREE( tmpTfPtr );
     config->flowCount--;
   }

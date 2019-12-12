@@ -117,7 +117,7 @@ void *xmalloc_( const int size, const char *filename, const int linenumber) {
   /* allocate buf */
   result = malloc( size );
   if ( result EQ NULL ) {
-    fprintf( stderr, "out of memory (%lu at %s:%d)!\n", size, filename, linenumber );
+    fprintf( stderr, "out of memory (%u at %s:%d)!\n", size, filename, linenumber );
 #ifdef MEM_DEBUG
     XFREE_ALL();
 #endif
@@ -169,7 +169,7 @@ void *xmalloc_( const int size, const char *filename, const int linenumber) {
  *
  ****/
 
-void *xmemcpy_( void *d_ptr, void *s_ptr, const int size, const char *filename, const int linenumber ) {
+void *xmemcpy_( void *d_ptr, const void *s_ptr, const size_t size, const char *filename, const int linenumber ) {
   void *result;
 #ifdef MEM_DEBUG
   PRIVATE struct Mem_s *mem_ptr;
@@ -577,7 +577,7 @@ char *xstrdup_( const char *str, const char *filename, const int linenumber ) {
 
 void xgrow_( void **old, int elementSize, int *oldCount, int newCount, char *filename, const int linenumber ) {
   void *tmp;
-  int size;
+  size_t size;
 
   size = newCount * elementSize;
   if ( size EQ 0 )

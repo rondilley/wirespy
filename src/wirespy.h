@@ -29,6 +29,10 @@
  *
  ****/
 
+/* program names */
+#define PROG_WSD    0
+#define PROG_FLOW   1
+
 /* arg len boundary */
 #define MAX_ARG_LEN 1024
 
@@ -42,6 +46,15 @@
 /* user and group defaults */
 #define MAX_USER_LEN 16
 #define MAX_GROUP_LEN 16
+
+/* TCP states */
+#define TCP_FLOW_IGNORE 0
+#define TCP_FLOW_SYN    1
+#define TCP_FLOW_SYNACK 2
+#define TCP_FLOW_EST    3
+#define TCP_FLOW_FIN1   4
+#define TCP_FLOW_FIN2   5
+#define TCP_FLOW_CLOSED 6
 
 /****
  *
@@ -86,14 +99,6 @@ struct trafficRecord {
   struct trafficRecord *prev;
 };
 
-#define TCP_FLOW_IGNORE 0
-#define TCP_FLOW_SYN    1
-#define TCP_FLOW_SYNACK 2
-#define TCP_FLOW_EST    3
-#define TCP_FLOW_FIN1   4
-#define TCP_FLOW_FIN2   5
-#define TCP_FLOW_CLOSED 6
-
 /* tcp flows */
 struct tcpFlow {
   time_t firstUpdate;
@@ -108,6 +113,7 @@ struct tcpFlow {
   size_t recordCount;
   struct trafficAddressRecord aRecOut;
   struct trafficAddressRecord aRecIn;
+  void *data;
   struct tcpFlow *prev;
   struct tcpFlow *next;
   struct trafficRecord *head;
@@ -157,6 +163,7 @@ struct accessControlList {
 
 /* prog config */
 typedef struct {
+  int program;
   uid_t starting_uid;
   uid_t uid;
   gid_t gid;
