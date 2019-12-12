@@ -224,4 +224,5 @@ PRIVATE void cleanup( void ) {
   XFREE_ALL();
 #endif
   XFREE( config );
+  config = NULL;
 }

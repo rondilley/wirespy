@@ -1189,7 +1189,8 @@ PRIVATE void cleanup( void ) {
   #ifdef MEM_DEBUG
   XFREE_ALL();
 #endif
-  XFREE( config );
+  if ( config != NULL )
+   XFREE( config );
 }
 
 /****
