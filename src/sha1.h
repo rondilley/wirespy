@@ -23,7 +23,7 @@
 
 /* includes */
 #include <string.h>
-#include <common.h>
+#include "../include/common.h"
 
 /* typedefs and structs */
 typedef struct {

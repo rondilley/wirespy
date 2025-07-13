@@ -39,13 +39,13 @@
 #include <config.h>
 #endif
 
-#include <sysdep.h>
+#include "../include/sysdep.h"
 
 #ifndef SYSDEP_DOT_H
 #error something is messed up
 #endif
 
-#include <common.h>
+#include "../include/common.h"
 #include "util.h"
 #include "mem.h"
 #include "wirespy.h"
