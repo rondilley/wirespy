@@ -17,6 +17,12 @@
 
 2017-12-29  Ron Dilley <ron.dilley@uberadmin.com>
 
-        * Added offline pcap processing
-        * Added flow state caching
+    * Added offline pcap processing
+    * Added flow state caching
 
+2025-07-13  Ron Dilley <ron.dilley@uberadmin.com>
+
+	* Fixed some minor vulnerabilities
+	* Added --enable-hardening build switch
+	* Added --enable-static-analysis build switch
+	

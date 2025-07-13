@@ -174,6 +174,11 @@ int main(int argc, char *argv[]) {
 
         case 'p':
             /* define the location of the pid file used for rotating logs, etc */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid PID file path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             pid_file = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( pid_file, 0, MAXPATHLEN+1 );
             strncpy( pid_file, optarg, MAXPATHLEN );
@@ -181,6 +186,11 @@ int main(int argc, char *argv[]) {
 
         case 'l':
             /* define the dir to store logs in */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid log directory path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             config->log_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( config->log_dir, 0, MAXPATHLEN+1 );
             strncpy( config->log_dir, optarg, MAXPATHLEN );
@@ -188,6 +198,11 @@ int main(int argc, char *argv[]) {
       
         case 'L':
             /* define the file, overrides -l */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid log file path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             config->log_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( config->log_fName, 0, MAXPATHLEN+1 );
             strncpy( config->log_fName, optarg, MAXPATHLEN );
@@ -195,6 +210,11 @@ int main(int argc, char *argv[]) {
       
         case 'r':
             /* define pcap file to read from */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid pcap file path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             config->pcap_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( config->pcap_fName, 0, MAXPATHLEN+1 );
             strncpy( config->pcap_fName, optarg, MAXPATHLEN );
@@ -203,6 +223,11 @@ int main(int argc, char *argv[]) {
 
         case 'W':
             /* define flow cache file to write to */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid flow cache write path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             config->wFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( config->wFlow_fName, 0, MAXPATHLEN+1 );
             strncpy( config->wFlow_fName, optarg, MAXPATHLEN );
@@ -210,6 +235,11 @@ int main(int argc, char *argv[]) {
       
         case 'R':
             /* define flow cache file to read from */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid flow cache read path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             config->rFlow_fName = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( config->rFlow_fName, 0, MAXPATHLEN+1 );
             strncpy( config->rFlow_fName, optarg, MAXPATHLEN );
@@ -217,6 +247,11 @@ int main(int argc, char *argv[]) {
       
         case 'c':
             /* chroot the process into the specific dir */
+            if ( !is_path_safe( optarg ) ) {
+                fprintf( stderr, "ERR - Invalid chroot directory path [%s]\n", optarg );
+                cleanup();
+                exit( EXIT_FAILURE );
+            }
             chroot_dir = ( char * )XMALLOC( MAXPATHLEN+1 );
             XMEMSET( chroot_dir, 0, MAXPATHLEN+1 );
             strncpy( chroot_dir, optarg, MAXPATHLEN );
@@ -448,6 +483,41 @@ int main(int argc, char *argv[]) {
 }
 
   config->cur_pid = getpid();
+
+  /* drop privileges if specified */
+  if ( config->gid != getgid() ) {
+    if ( setgid( config->gid ) != 0 ) {
+      display( LOG_ERR, "Unable to drop group privileges to gid %d", config->gid );
+      cleanup();
+      exit( EXIT_FAILURE );
+    }
+#ifdef DEBUG
+    if ( config->debug >= 2 ) {
+      display( LOG_DEBUG, "Dropped group privileges to gid %d", config->gid );
+    }
+#endif
+  }
+
+  if ( config->uid != getuid() ) {
+    if ( setuid( config->uid ) != 0 ) {
+      display( LOG_ERR, "Unable to drop user privileges to uid %d", config->uid );
+      cleanup();
+      exit( EXIT_FAILURE );
+    }
+#ifdef DEBUG
+    if ( config->debug >= 2 ) {
+      display( LOG_DEBUG, "Dropped user privileges to uid %d", config->uid );
+    }
+#endif
+    
+    /* verify we cannot regain privileges */
+    if ( setuid( 0 ) == 0 ) {
+      display( LOG_ERR, "SECURITY ERROR: Able to regain root privileges after dropping them" );
+      cleanup();
+      exit( EXIT_FAILURE );
+    }
+  }
+
   /* start collecting */
   display( LOG_INFO, "Listening" );
   
@@ -528,11 +598,8 @@ void show_info( void ) {
  ****/
  
 void sigint_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  /* do a calm shutdown as time and pcap_loop permit */
+  /* Only use async-safe operations in signal handlers */
   quit = TRUE;
-  signal( signo, sigint_handler );
 }
 
 /****
@@ -542,11 +609,8 @@ void sigint_handler( int signo ) {
  ****/
  
 void sigterm_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  /* do a calm shutdown as time and pcap_loop permit */
+  /* Only use async-safe operations in signal handlers */
   quit = TRUE;
-  signal( signo, sigterm_handler );
 }
 
 /****
@@ -556,11 +620,8 @@ void sigterm_handler( int signo ) {
  ****/
  
 void sighup_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  /* time to rotate logs and check the config */
+  /* Only use async-safe operations in signal handlers */
   reload = TRUE;
-  signal( SIGHUP, sighup_handler );
 }
 
 /****
@@ -570,16 +631,17 @@ void sighup_handler( int signo ) {
  ****/
  
 void sigsegv_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "Caught a sig%d, shutting down fast\n", signo );
-  /* pcmcia nics seem to do strange things sometimes if pcap does not close clean */
-  pcap_close( config->pcap_handle );
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
-  /* core out */
-  abort();
+  /* Async-safe error message using write() */
+  const char msg[] = "FATAL: Segmentation fault, terminating\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* Suppress unused result warning */
+  
+  /* Set termination flag for main loop cleanup */
+  quit = TRUE;
+  
+  /* Restore default signal handler and re-raise to get core dump */
+  signal(signo, SIG_DFL);
+  raise(signo);
 }
 
 /****
@@ -589,16 +651,17 @@ void sigsegv_handler( int signo ) {
  ****/
  
 void sigbus_handler( int signo ) {
-  signal( signo, SIG_IGN );
+  /* Async-safe error message using write() */
+  const char msg[] = "FATAL: Bus error, terminating\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* Suppress unused result warning */
   
-  fprintf( stderr, "Caught a sig%d, shutting down fast\n", signo );
-  /* pcmcia nics seem to do strange things sometimes if pcap does not close clean */
-  pcap_close( config->pcap_handle );
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
-  /* core out */
-  abort();
+  /* Set termination flag for main loop cleanup */
+  quit = TRUE;
+  
+  /* Restore default signal handler and re-raise to get core dump */
+  signal(signo, SIG_DFL);
+  raise(signo);
 }
 
 /****
@@ -608,16 +671,17 @@ void sigbus_handler( int signo ) {
  ****/
  
 void sigill_handler ( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "Caught a sig%d, shutting down fast\n", signo );
-  /* pcmcia nics seem to do strange things sometimes if pcap does not close clean */
-  pcap_close( config->pcap_handle );
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
-  /* core out */
-  abort();
+  /* Async-safe error message using write() */
+  const char msg[] = "FATAL: Illegal instruction, terminating\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* Suppress unused result warning */
+  
+  /* Set termination flag for main loop cleanup */
+  quit = TRUE;
+  
+  /* Restore default signal handler and re-raise to get core dump */
+  signal(signo, SIG_DFL);
+  raise(signo);
 }
 
 /****
@@ -627,16 +691,17 @@ void sigill_handler ( int signo ) {
  ****/
  
 void sigfpe_handler( int signo ) {
-  signal( signo, SIG_IGN );
-
-  fprintf( stderr, "Caught a sig%d, shutting down fast\n", signo );
-  /* pcmcia nics seem to do strange things sometimes if pcap does not close clean */
-  pcap_close( config->pcap_handle );
-#ifdef MEM_DEBUG
-  XFREE_ALL();
-#endif
-  /* core out */
-  abort();
+  /* Async-safe error message using write() */
+  const char msg[] = "FATAL: Floating point exception, terminating\n";
+  ssize_t result = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+  (void)result; /* Suppress unused result warning */
+  
+  /* Set termination flag for main loop cleanup */
+  quit = TRUE;
+  
+  /* Restore default signal handler and re-raise to get core dump */
+  signal(signo, SIG_DFL);
+  raise(signo);
 }
 
 /*****
@@ -646,22 +711,12 @@ void sigfpe_handler( int signo ) {
  *****/
 
 void ctime_prog( int signo ) {
-  time_t ret;
-
-  /* disable SIGALRM */
-  signal( SIGALRM, SIG_IGN );
-  /* update current time */
-  if ( ( ret = time( &config->current_time ) ) EQ FAILED ) {
-    display( LOG_ERR, "Unable to update time [%d]", errno );
-  } else if ( ret != config->current_time ) {
-    display( LOG_WARNING, "Time update inconsistent [%d] [%d]", ret, config->current_time );
-  }
-
+  /* Only perform async-safe operations in signal handler */
+  /* Just update the time - error checking will be done in main loop */
+  time( &config->current_time );
   config->pruneCounter++;
   
-  /* reset SIGALRM */
-  signal( SIGALRM, ctime_prog );
-  /* reset alarm */
+  /* Reset alarm for next update */
   alarm( 5 );
 }
 

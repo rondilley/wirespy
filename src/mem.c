@@ -75,15 +75,27 @@ PRIVATE struct Mem_s *tail = NULL;
 PUBLIC char *copy_argv(char *argv[]) {
   PRIVATE char **arg;
   PRIVATE char *buf;
-  PRIVATE int total_length = 0;
+  PRIVATE size_t total_length = 0;
+  PRIVATE size_t arg_len;
 
   for (arg = argv; *arg != NULL; arg++) {
-    total_length += (strlen(*arg) + 1); /* length of arg plus space */
+    arg_len = strlen(*arg);
+    /* Check for integer overflow */
+    if (total_length > SIZE_MAX - arg_len - 1) {
+      fprintf(stderr, "ERROR: Integer overflow in copy_argv\n");
+      return NULL;
+    }
+    total_length += (arg_len + 1); /* length of arg plus space */
   }
 
   if (total_length == 0)
     return NULL;
 
+  /* Check for overflow when adding null terminator */
+  if (total_length > SIZE_MAX - 1) {
+    fprintf(stderr, "ERROR: Integer overflow in copy_argv\n");
+    return NULL;
+  }
   total_length++; /* add room for a null */
 
   buf = (char *)XMALLOC(sizeof(char) * total_length);

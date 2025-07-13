@@ -42,6 +42,134 @@ AC_ARG_ENABLE(showmemdebug,
       CFLAGS="${CFLAGS} -DMEM_DEBUG -DSHOW_MEM_DEBUG"
     ,)
 
+HARDENING="yes"
+AC_ARG_ENABLE(hardening,
+    [  --disable-hardening     Disable compiler security hardening],
+    [ if test "$enableval" = "no"; then
+          HARDENING="no"
+      fi
+    ],)
+
+dnl ############# Security Hardening Flags
+
+if test "$HARDENING" = "yes"; then
+    if test "$GCC" = yes; then
+        AC_MSG_CHECKING([for compiler hardening support])
+        
+        dnl Stack protection
+        CFLAGS="${CFLAGS} -fstack-protector-strong"
+        CFLAGS="${CFLAGS} -fstack-clash-protection"
+        
+        dnl Fortification
+        CFLAGS="${CFLAGS} -D_FORTIFY_SOURCE=2"
+        
+        dnl Position Independent Code
+        CFLAGS="${CFLAGS} -fPIC"
+        
+        dnl Control Flow Integrity (where supported)
+        CFLAGS="${CFLAGS} -fcf-protection=full"
+        
+        dnl Additional security flags
+        CFLAGS="${CFLAGS} -Wformat -Wformat-security"
+        CFLAGS="${CFLAGS} -Werror=format-security"
+        CFLAGS="${CFLAGS} -fno-common"
+        CFLAGS="${CFLAGS} -fno-strict-overflow"
+        
+        dnl Linker hardening
+        LDFLAGS="${LDFLAGS} -Wl,-z,relro,-z,now"
+        LDFLAGS="${LDFLAGS} -Wl,-z,noexecstack"
+        LDFLAGS="${LDFLAGS} -pie"
+        
+        AC_MSG_RESULT([enabled])
+    else
+        AC_MSG_RESULT([not supported with current compiler])
+    fi
+fi
+
+STATIC_ANALYSIS="no"
+AC_ARG_ENABLE(static-analysis,
+    [  --enable-static-analysis Enable compiler static analysis],
+    [ if test "$enableval" = "yes"; then
+          STATIC_ANALYSIS="yes"
+      fi
+    ],)
+
+dnl ############# Static Analysis Flags
+
+if test "$STATIC_ANALYSIS" = "yes"; then
+    if test "$GCC" = yes; then
+        AC_MSG_CHECKING([for GCC static analysis support])
+        
+        dnl Enable GCC static analyzer (GCC 10+)
+        CFLAGS="${CFLAGS} -fanalyzer"
+        
+        dnl Comprehensive warning flags
+        CFLAGS="${CFLAGS} -Wall -Wextra -Wpedantic"
+        CFLAGS="${CFLAGS} -Wformat=2 -Wformat-overflow=2 -Wformat-truncation=2"
+        CFLAGS="${CFLAGS} -Wstringop-overflow=4 -Walloc-zero -Walloca"
+        CFLAGS="${CFLAGS} -Warray-bounds=2 -Wattribute-alias=2"
+        CFLAGS="${CFLAGS} -Wduplicated-branches -Wduplicated-cond"
+        CFLAGS="${CFLAGS} -Wfloat-equal -Wlogical-op -Wrestrict"
+        CFLAGS="${CFLAGS} -Wnull-dereference -Wvla-larger-than=1024"
+        CFLAGS="${CFLAGS} -Wstack-protector -Wstringop-truncation"
+        CFLAGS="${CFLAGS} -Wshadow -Wundef -Wunused -Wuninitialized"
+        CFLAGS="${CFLAGS} -Wstrict-overflow=5 -Wwrite-strings"
+        CFLAGS="${CFLAGS} -Wconversion -Wsign-conversion"
+        CFLAGS="${CFLAGS} -Wmissing-prototypes -Wmissing-declarations"
+        CFLAGS="${CFLAGS} -Wredundant-decls -Wnested-externs"
+        CFLAGS="${CFLAGS} -Winline -Wcast-align=strict"
+        CFLAGS="${CFLAGS} -Wcast-qual -Wpointer-arith"
+        CFLAGS="${CFLAGS} -Wbad-function-cast -Wstrict-prototypes"
+        CFLAGS="${CFLAGS} -Wold-style-definition"
+        
+        dnl Security-focused warnings
+        CFLAGS="${CFLAGS} -Wtrampolines -Wjump-misses-init"
+        CFLAGS="${CFLAGS} -Wunsafe-loop-optimizations"
+        CFLAGS="${CFLAGS} -Wstack-usage=8192"
+        
+        AC_MSG_RESULT([enabled])
+    else
+        AC_MSG_RESULT([GCC required for static analysis])
+        AC_MSG_ERROR([Static analysis requires GCC compiler])
+    fi
+fi
+
+SANITIZERS="no"
+AC_ARG_ENABLE(sanitizers,
+    [  --enable-sanitizers     Enable runtime sanitizers (debug builds)],
+    [ if test "$enableval" = "yes"; then
+          SANITIZERS="yes"
+      fi
+    ],)
+
+dnl ############# Sanitizer Flags
+
+if test "$SANITIZERS" = "yes"; then
+    if test "$GCC" = yes; then
+        AC_MSG_CHECKING([for sanitizer support])
+        
+        dnl Address and leak sanitizer
+        CFLAGS="${CFLAGS} -fsanitize=address,leak"
+        LDFLAGS="${LDFLAGS} -fsanitize=address,leak"
+        
+        dnl Undefined behavior sanitizer
+        CFLAGS="${CFLAGS} -fsanitize=undefined,signed-integer-overflow"
+        LDFLAGS="${LDFLAGS} -fsanitize=undefined,signed-integer-overflow"
+        
+        dnl Additional sanitizer options
+        CFLAGS="${CFLAGS} -fsanitize-address-use-after-scope"
+        CFLAGS="${CFLAGS} -fstack-protector-all"
+        
+        dnl Debug info for better stack traces
+        CFLAGS="${CFLAGS} -g3 -O1"
+        
+        AC_MSG_RESULT([enabled])
+    else
+        AC_MSG_RESULT([GCC required for sanitizers])
+        AC_MSG_ERROR([Sanitizers require GCC compiler])
+    fi
+fi
+
 dnl ############# System Dependencies
 
 AC_MSG_CHECKING([for special system dependencies])

@@ -36,6 +36,7 @@
  ****/
 
 #include "wsd.h"
+#include <libgen.h>  /* for dirname() */
 
 /****
  *
@@ -180,6 +181,69 @@ int is_dir_safe( const char *dir ) {
 
 /****
  *
+ * validate that a path is safe and doesn't contain directory traversal
+ *
+ ****/
+
+int is_path_safe( const char *path ) {
+  char *resolved_path;
+  char *ptr;
+  int safe = TRUE;
+  
+  if ( path == NULL || strlen(path) == 0 ) {
+    return FAILED;
+  }
+  
+  /* Check for obvious directory traversal patterns */
+  if ( strstr(path, "../") != NULL || strstr(path, "..\\") != NULL ) {
+    display( LOG_ERR, "Path contains directory traversal: %s", path );
+    return FAILED;
+  }
+  
+  /* Check for absolute paths when not expected */
+  if ( path[0] == '/' && strlen(path) > 1 ) {
+    /* Allow absolute paths but validate they resolve properly */
+    resolved_path = realpath(path, NULL);
+    if ( resolved_path == NULL ) {
+      /* Path doesn't exist yet, check parent directory */
+      char *path_copy = strdup(path);
+      char *dir_name = dirname(path_copy);
+      resolved_path = realpath(dir_name, NULL);
+      free(path_copy);
+      if ( resolved_path == NULL ) {
+        display( LOG_ERR, "Invalid path or parent directory: %s", path );
+        return FAILED;
+      }
+    }
+    
+    /* Check if resolved path stays within expected boundaries */
+    if ( strncmp(resolved_path, "/tmp", 4) == 0 || 
+         strncmp(resolved_path, "/var", 4) == 0 ||
+         strncmp(resolved_path, "/usr/local", 10) == 0 ||
+         strncmp(resolved_path, "/home", 5) == 0 ) {
+      safe = TRUE;
+    } else {
+      display( LOG_ERR, "Path outside allowed directories: %s -> %s", path, resolved_path );
+      safe = FAILED;
+    }
+    
+    free(resolved_path);
+    return safe;
+  }
+  
+  /* For relative paths, ensure they don't contain null bytes or other dangerous chars */
+  for ( ptr = (char *)path; *ptr != '\0'; ptr++ ) {
+    if ( *ptr == '\0' || *ptr < 32 || *ptr > 126 ) {
+      display( LOG_ERR, "Path contains invalid characters: %s", path );
+      return FAILED;
+    }
+  }
+  
+  return TRUE;
+}
+
+/****
+ *
  * create pid file
  *
  ****/
@@ -227,15 +291,32 @@ static int safe_open( const char *filename ) {
   struct stat sb;
   XMEMSET( &sb, 0, sizeof( struct stat ) );
                                                                  
-  if ( lstat(filename, &sb) EQ FAILED ) {
-    if (errno != ENOENT)
-      return( FAILED );
-  } else if ( ( sb.st_mode & S_IFREG) EQ 0 ) {
-    errno = EOPNOTSUPP;
-    return ( FAILED );
+  /* First try to create the file atomically */
+  fd = open( filename, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH );
+  if ( fd >= 0 ) {
+    return fd;  /* Successfully created new file */
   }
-
-  unlink( filename );
+  
+  if ( errno != EEXIST ) {
+    return FAILED;  /* Some other error occurred */
+  }
+  
+  /* File exists, check if it's safe to replace */
+  if ( lstat(filename, &sb) EQ FAILED ) {
+    return FAILED;
+  }
+  
+  /* Ensure it's a regular file and not a symlink or special file */
+  if ( ( sb.st_mode & S_IFREG) EQ 0 ) {
+    errno = EOPNOTSUPP;
+    return FAILED;
+  }
+  
+  /* Remove existing file and try again atomically */
+  if ( unlink( filename ) EQ FAILED ) {
+    return FAILED;
+  }
+  
   fd = open( filename, O_WRONLY|O_CREAT|O_EXCL, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH );
 
   return (fd);
@@ -295,8 +376,8 @@ void sanitize_environment( void ) {
     new_environ[arr_ptr++] = ptr;
     len = strlen( var );
     XMEMCPY( ptr, var, len );
-    *(ptr + len + 1 ) = '=';
-    XMEMCPY( ptr + len + 2, value, strlen( value ) + 1 );
+    *(ptr + len) = '=';
+    XMEMCPY( ptr + len + 1, value, strlen( value ) + 1 );
     ptr += len + strlen( value ) + 2;
   }
 
