@@ -39,7 +39,7 @@
  *
  ****/
 
-int display( int level, char *format, ... );
+int display( int level, const char *format, ... );
 int open_devnull( int fd );
 int is_dir_safe( const char *dir );
 int is_path_safe( const char *path );

@@ -144,15 +144,8 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
   const u_int length = header->len;
   const u_int caplen = header->caplen;
   u_int family;
-  const char *payload;
-  const char *tmp_ptr;
-  PRIVATE int bytes_sent;
-  PRIVATE struct tm pkt_time;
-  PRIVATE int payload_size;
   /* pre-allocated traffic record */
   PRIVATE struct trafficRecord tr;
-  PRIVATE struct trafficRecord *tr_tmp;
-  PRIVATE struct tcpFlow *tf_ptr;
 
 #ifdef DEBUG
   if ( length != caplen ) {
@@ -232,22 +225,12 @@ void dl_null( u_char *args, const struct pcap_pkthdr *header, const u_char *pack
 
 void dl_ethernet( u_char *args, const struct pcap_pkthdr *header, const u_char *packet ) {
   struct ether_header *ethernet_ptr;
-  char *payload;
-  char *tmp_ptr;
   int size_ethernet = sizeof( struct ether_header );
-  PRIVATE int bytes_sent;
-  /* this is easier to read */
-  PRIVATE char s_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
-  PRIVATE char d_eth_addr_str[(ETHER_ADDR_LEN*2)+ETHER_ADDR_LEN];
   /* libnet uses this format */
   PRIVATE u_char s_eth_addr[ETHER_ADDR_LEN];
   PRIVATE u_char d_eth_addr[ETHER_ADDR_LEN];
-  PRIVATE struct tm pkt_time;
-  PRIVATE int payload_size;
   /* pre-allocated traffic record */
   PRIVATE struct trafficRecord tr;
-  PRIVATE struct trafficRecord *tr_tmp;
-  PRIVATE struct tcpFlow *tf_ptr;
 
 #ifdef DEBUG
   if ( config->debug >= 4 ) {

@@ -18,3 +18,7 @@ Version 0.4 (Dec 27, 2017):
 Version 0.8 (July 13, 2025):
 
 * Minor security enhancements
+
+Version 0.9 (Aug 20, 2025):
+
+* Cleaned up compiler warnings

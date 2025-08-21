@@ -803,7 +803,7 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
   }
 
 #if SIZEOF_SIZE_T == 8
-  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u)\n",
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d)\n",
 	   tr->wire_sec,
            tr->wire_usec,
 #else
@@ -812,9 +812,9 @@ void logTcpPacket( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct tr
 	   tr->wire_sec );
   fprintf( config->log_st, "%06lu] ",
 	   tr->wire_usec );
-  fprintf( config->log_st, "%17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u)\n",
+  fprintf( config->log_st, "%17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d)\n",
 #else
-  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u)\n",
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d)\n",
 	   tr->wire_sec,
            tr->wire_usec,
 #endif
@@ -952,7 +952,7 @@ void logTcpPacketErr( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct
   }
 
 #if SIZEOF_SIZE_T == 8
-  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d) - %s\n",
 	   tr->wire_sec,
            tr->wire_usec,
 #else
@@ -961,9 +961,9 @@ void logTcpPacketErr( struct tcpFlow *tfPtr, const struct tcphdr *tcpPtr, struct
 	   tr->wire_sec );
   fprintf( config->log_st, "%06lu] ",
 	   tr->wire_usec );
-  fprintf( config->log_st, "%17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+  fprintf( config->log_st, "%17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d) - %s\n",
 #else
-  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%u) ack: %-10u (+%u) - %s\n",
+  fprintf( config->log_st, "[%lu.%06lu] %17s->%-17s %16s:%-5u %s %16s:%-5u TCP [%s] win: %u seq: %-10u (+%d) ack: %-10u (+%d) - %s\n",
 	   tr->wire_sec,
            tr->wire_usec,
 #endif

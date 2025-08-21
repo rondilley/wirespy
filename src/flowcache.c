@@ -70,9 +70,7 @@ extern void cleanupTcpFlows( void );
  ****/
 
 int main(int argc, char *argv[]) {
-  PRIVATE int pid = 0;
-  PRIVATE int c = 0, i = 0, fds = 0, status = 0;
-  int digit_optind = 0;
+  PRIVATE int c = 0;
   PRIVATE char **ptr;
 
 
@@ -88,7 +86,6 @@ int main(int argc, char *argv[]) {
   XMEMSET( config, 0, sizeof( Config_t ) );
 
   while (1) {
-    int this_option_optind = optind ? optind : 1;
     int option_index = 0;
     static struct option long_options[] = {
       {"version", no_argument, 0, 'v' },

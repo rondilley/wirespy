@@ -251,7 +251,7 @@ int addUniqueHashRec( struct hash_s *hash, const char *keyString, int keyLen, vo
   key = val % hash->size;
 
   if ( key > hash->size ) {
-    fprintf( stderr, "ERR - Key outside of valid record range [%d]\n", key );
+    fprintf( stderr, "ERR - Key outside of valid record range [%u]\n", key );
   }
 
 #ifdef DEBUG
@@ -843,7 +843,7 @@ struct hash_s *dyGrowHash( struct hash_s *oldHash ) {
 #endif
 
     if ( tmpHash->totalRecords != oldHash->totalRecords ) {
-      fprintf( stderr, "ERR - New hash is not the same size as the old hash [%d->%d]\n", oldHash->totalRecords, tmpHash->totalRecords );
+      fprintf( stderr, "ERR - New hash is not the same size as the old hash [%u->%u]\n", oldHash->totalRecords, tmpHash->totalRecords );
     }
     XFREE( oldHash->records );
     XFREE( oldHash );

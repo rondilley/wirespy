@@ -34,7 +34,7 @@ libpcap format files.
 Below are the options that wirespy supports.
 
 ```
-wsd v0.8 [Jul 13 2025 - 11:27:41]
+wsd v0.9 [Aug 20 2025 - 19:20:57]
 
 syntax: wsd [options]
  -c|--chroot {dir}    chroot into directory
@@ -59,7 +59,7 @@ background.
 
 ```sh
 % sudo ./wsd
-wsd v0.6 [Jan  3 2018 - 18:00:21] starting in daemon mode
+wsd v0.9 [Aug 20 2025 - 19:20:57] starting in daemon mode
 ```
 
 You can also specify the interface to monitor using the -i|--iniface command line switch.

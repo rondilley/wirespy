@@ -50,8 +50,6 @@ PUBLIC Config_t *config = NULL;
  *
  ****/
 
-extern int errno;
-extern char **environ;
 
 /****
  * 
@@ -71,11 +69,9 @@ extern void cleanupTcpFlows( void );
 
 int main(int argc, char *argv[]) {
   PRIVATE int pid = 0;
-  PRIVATE int c = 0, i = 0, fds = 0, status = 0;
-  int digit_optind = 0;
+  PRIVATE int c = 0, i = 0, fds = 0;
   PRIVATE struct passwd *pwd_ent;
   PRIVATE struct group *grp_ent;
-  PRIVATE char **ptr;
   char *tmp_ptr = NULL;
   char *pid_file = NULL;
   char *home_dir = NULL;
@@ -121,7 +117,6 @@ int main(int argc, char *argv[]) {
   config->uid = getuid();
 
   while (1) {
-    int this_option_optind = optind ? optind : 1;
 #ifdef HAVE_GETOPT_LONG
     int option_index = 0;
     static struct option long_options[] = {
@@ -556,7 +551,7 @@ int main(int argc, char *argv[]) {
   }
 
   /* shut everything down */
-  if ( config->pcap_handle > 0 ) {
+  if ( config->pcap_handle != NULL ) {
     pcap_close( config->pcap_handle );
   }
 
@@ -597,7 +592,7 @@ void show_info( void ) {
  *
  ****/
  
-void sigint_handler( int signo ) {
+void sigint_handler( int signo __attribute__((unused)) ) {
   /* Only use async-safe operations in signal handlers */
   quit = TRUE;
 }
@@ -608,7 +603,7 @@ void sigint_handler( int signo ) {
  *
  ****/
  
-void sigterm_handler( int signo ) {
+void sigterm_handler( int signo __attribute__((unused)) ) {
   /* Only use async-safe operations in signal handlers */
   quit = TRUE;
 }
@@ -619,7 +614,7 @@ void sigterm_handler( int signo ) {
  *
  ****/
  
-void sighup_handler( int signo ) {
+void sighup_handler( int signo __attribute__((unused)) ) {
   /* Only use async-safe operations in signal handlers */
   reload = TRUE;
 }
@@ -710,7 +705,7 @@ void sigfpe_handler( int signo ) {
  *
  *****/
 
-void ctime_prog( int signo ) {
+void ctime_prog( int signo __attribute__((unused)) ) {
   /* Only perform async-safe operations in signal handler */
   /* Just update the time - error checking will be done in main loop */
   time( &config->current_time );
@@ -967,11 +962,23 @@ PRIVATE int start_collecting( void ) {
     /* no device specified, pick the first one */
     config->in_iface = ( char * )XMALLOC( (sizeof(char)*MAXPATHLEN)+1 );
     XMEMSET( config->in_iface, 0, (sizeof(char)*MAXPATHLEN)+1 );
-    if ( ( tmp_dev = pcap_lookupdev( errbuf ) ) EQ NULL ) {
-      display( LOG_ERR, "unable to find device to monitor" );
+    
+    /* use pcap_findalldevs instead of deprecated pcap_lookupdev */
+    pcap_if_t *alldevs, *device;
+    if ( pcap_findalldevs( &alldevs, errbuf ) == -1 ) {
+      display( LOG_ERR, "unable to find devices to monitor: %s", errbuf );
       return FAILED;
     }
-    strncpy( config->in_iface, tmp_dev, MAXPATHLEN );
+    
+    if ( alldevs == NULL ) {
+      display( LOG_ERR, "no devices found to monitor" );
+      return FAILED;
+    }
+    
+    /* use the first device in the list */
+    device = alldevs;
+    strncpy( config->in_iface, device->name, MAXPATHLEN );
+    pcap_freealldevs( alldevs );
   }
 
   /* get ip addr and mtu */

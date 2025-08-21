@@ -33,7 +33,7 @@
 # include <config.h>
 #endif
 
-#include "../include/sysdep.h">"
+#include "../include/sysdep.h"
 
 #ifndef SYSDEP_DOT_H
 # error something is messed up

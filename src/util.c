@@ -76,7 +76,7 @@ extern char **environ;
  *
  ****/
 
-int display( int level, char *format, ... ) {
+int display( int level, const char *format, ... ) {
   PRIVATE va_list args;
   PRIVATE char tmp_buf[SYSLOG_MAX+1];
   PRIVATE int i;

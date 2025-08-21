@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script
 m4_include([version.m4])
-AC_PREREQ([2.59])
-AC_INIT([wsd], VERSION_NUMBER)
+AC_PREREQ([2.71])
+AC_INIT([wsd],[VERSION_NUMBER])
 AC_CONFIG_SRCDIR(src/main.c)
 AC_CONFIG_AUX_DIR(config)
 AM_INIT_AUTOMAKE([1.11])
@@ -418,15 +418,17 @@ dnl ############## Type checks
 
 AC_STRUCT_TM
 AC_TYPE_PID_T
-AC_TYPE_SIGNAL
+dnl Modern C assumes signal handlers return void
+AC_DEFINE([RETSIGTYPE],[void],[Define as the return type of signal handlers])
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
 AC_CHECK_SIZEOF([size_t])
 AC_CHECK_SIZEOF([time_t])
 
-AM_CONFIG_HEADER(include/config.h)
+AC_CONFIG_HEADERS([include/config.h])
 AC_PROG_INSTALL
-AC_OUTPUT(Makefile src/Makefile wsd.1)
+AC_CONFIG_FILES([Makefile src/Makefile wsd.1])
+AC_OUTPUT
 
 BINDIR=`eval echo ${bindir}`; BINDIR=`eval echo ${BINDIR}`;
 MANDIR=`eval echo ${mandir}/${mansubdir}`; MANDIR=`eval echo ${MANDIR}`;

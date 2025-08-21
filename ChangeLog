@@ -25,4 +25,7 @@
 	* Fixed some minor vulnerabilities
 	* Added --enable-hardening build switch
 	* Added --enable-static-analysis build switch
-	
+
+2025-08-20  Ron Dilley <ron.dilley@uberadmin.com>
+
+	* Cleaned up compiler warnings
